@@ -281,15 +281,16 @@ evalVarsAux xs (y ∷ ys) (suc num) (s≤s lt) rewrite sym (++-assoc xs (y ∷ [
   get-y rewrite get-append-front (xs ++ y ∷ []) ys (length xs) LT | sym (+-identityʳ (length xs)) =
     get-append-back xs (y ∷ []) 0
 
-evalVars : ∀ (ρ : ILEnv) num
-  → num ≤ length ρ
-  → ρ ⊢ varsRange 0 num ⟱ take num ρ
-evalVars ρ num lt = evalVarsAux [] ρ num lt 
-
 take-length : ∀ {T : Set} (xs : List T)
   → take (length xs) xs ≡ xs
 take-length [] = refl
 take-length (x ∷ xs) = cong (λ X → x ∷ X) (take-length xs)
+
+evalVars : ∀ (ρ : ILEnv) 
+  → ρ ⊢ varsRange 0 (length ρ) ⟱ ρ
+evalVars ρ
+    with evalVarsAux [] ρ (length ρ) ≤-refl
+... | EV rewrite (take-length ρ) = EV
 
 evalRelated : ∀ M M′ ρ ρ′ V
   → length ρ ⊢ M ≋ M′
@@ -306,9 +307,7 @@ evalRelated .(ƛ N) .(δ _ • varsRange 0 n) ρ ρ′ .(clos N ρ) (lam≋{n}{N
   clos≈ N ρ N′ ρ′ N=N′ ρ=ρ′
   where
   Goal1 : ρ′ ⊢ varsRange 0 (length ρ) ⟱ ρ′
-  Goal1 rewrite length-≅ ρ=ρ′
-      with evalVars ρ′ (length ρ′) ≤-refl 
-  ... | EV rewrite take-length ρ′ = EV
+  Goal1 rewrite length-≅ ρ=ρ′ = evalVars ρ′
 evalRelated .(L · M) (L′ · M′) ρ ρ′ V (app≋ L=L′ M=M′) ρ=ρ′ (app⇓ .ρ L M N ρ″ W .V L⇓C M⇓W N⇓V)
     with evalRelated _ _ _ _ _ L=L′ ρ=ρ′ L⇓C
 ... | .(clos N′ ρ‴) , L′⇓C′ , clos≈ .N .ρ″ N′ ρ‴ N=N′ ρ″=ρ‴
