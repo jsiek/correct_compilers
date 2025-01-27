@@ -265,54 +265,6 @@ length-≅ : ∀ {ρ ρ′} → ρ ≅ ρ′ → length ρ ≡ length ρ′
 length-≅ {.[]} {.[]} empty≅ = refl
 length-≅ {.(_ ∷ _)} {.(_ ∷ _)} (cons≅ x ρ=ρ′) = cong suc (length-≅ ρ=ρ′)
 
-lookupInScope : ∀ {V : Set} x (ρ : List V)
-  → x < length ρ
-  → ∃[ V ] get x ρ ≡ just V
-lookupInScope zero (V ∷ ρ) x<ρ = V , refl
-lookupInScope (suc x) (V ∷ ρ) (s≤s x<ρ) = lookupInScope x ρ x<ρ
-
-{-
-evalVars : ∀ n ρ
-  → n ≤ length ρ
-  → ρ ⊢ varsTo n ⟱ gets (downFrom n) ρ
-evalVars zero ρ n<ρ = empty⟱ ρ
-evalVars (suc n) ρ n<ρ
-    with lookupInScope n ρ n<ρ
-... | W , eq rewrite eq =
-  let IH = evalVars n ρ (≤-trans (≤-step ≤-refl) n<ρ) in
-  cons⟱ (var⇩ ρ n W eq) IH
-
-gets-downFrom : ∀ {V : Set} (ρ : List V)
-  → gets (downFrom (length ρ)) ρ ≡ ρ
-gets-downFrom [] = refl
-gets-downFrom (V ∷ ρ)
-    with lookupInScope (length ρ) (V ∷ ρ) (s≤s ≤-refl)
-... | V′ , eq rewrite eq =
-  let IH = gets-downFrom ρ in
-  {!!}
-
--- gets (downFrom (length (V ∷ ρ))) (V ∷ ρ) ≡ V ∷ ρ
-
-≅-gets : ∀ {ρ ρ′}
-  → ρ ≅ ρ′
-  → ρ ≅ gets (downFrom (length ρ′)) ρ′
-≅-gets {.[]} {.[]} empty≅ = empty≅
-≅-gets {V ∷ ρ} {W ∷ ρ′} (cons≅ V=W ρ=ρ′) =
---  let IH : ρ ≅ gets (downFrom (length ρ)) ρ′
---      IH = ≅-gets {ρ}{ρ′} ρ=ρ′ in
-  {!!}
-  -}
-
-{-
-dropSome : ∀ {T : Set} (ρ : List T) n
-  → n < length ρ
-  → ∃[ V ] drop n ρ ≡ V ∷ drop (suc n) ρ
-dropSome (V ∷ ρ) zero (s≤s lt) = V , refl
-dropSome (V ∷ ρ) (suc n) (s≤s lt) 
-    with dropSome ρ n lt
-... | V , eq1 rewrite eq1 = V , refl
--}
-
 evalVarsAux : ∀ (xs ys : ILEnv) num
   → num ≤ length ys
   → (xs ++ ys) ⊢ varsRange (length xs) num ⟱ take num ys
@@ -333,29 +285,6 @@ evalVars : ∀ (ρ : ILEnv) num
   → num ≤ length ρ
   → ρ ⊢ varsRange 0 num ⟱ take num ρ
 evalVars ρ num lt = evalVarsAux [] ρ num lt 
-
-
-
-
-{-
-evalVars ρ start zero lt = empty⟱ ρ
-evalVars [] start (suc num) lt
-    rewrite (+-suc start num)
-    with lt
-... | ()  
-evalVars (V ∷ ρ) start (suc num) lt
-    rewrite (+-suc start num)
-    with lt
-... | s≤s lt2
-    with start
-... | 0 =
-    let IH = evalVars (V ∷ ρ) 1 num lt in
-    cons⟱ (var⇩ (V ∷ ρ) zero V refl) IH
-... | suc start′
-    with dropSome ρ start′ (≤-trans (s≤s (m≤m+n _ _)) lt2)
-... | V , eq1 rewrite eq1 =
-    cons⟱ (var⇩ {!!} {!!} V {!!}) {!!}
--}
 
 take-length : ∀ {T : Set} (xs : List T)
   → take (length xs) xs ≡ xs
@@ -380,8 +309,15 @@ evalRelated .(ƛ N) .(δ _ • varsRange 0 n) ρ ρ′ .(clos N ρ) (lam≋{n}{N
   Goal1 rewrite length-≅ ρ=ρ′
       with evalVars ρ′ (length ρ′) ≤-refl 
   ... | EV rewrite take-length ρ′ = EV
-  
-evalRelated .(L · M) M′ ρ ρ′ V M=M′ ρ=ρ′ (app⇓ .ρ L M N ρ′₁ W .V M⇓V M⇓V₁ M⇓V₂) = {!!}
+evalRelated .(L · M) (L′ · M′) ρ ρ′ V (app≋ L=L′ M=M′) ρ=ρ′ (app⇓ .ρ L M N ρ″ W .V L⇓C M⇓W N⇓V)
+    with evalRelated _ _ _ _ _ L=L′ ρ=ρ′ L⇓C
+... | .(clos N′ ρ‴) , L′⇓C′ , clos≈ .N .ρ″ N′ ρ‴ N=N′ ρ″=ρ‴
+    with evalRelated _ _ _ _ _ M=M′ ρ=ρ′ M⇓W
+... | W′ , M′⇓W′ , W=W′
+    with evalRelated _ _ _ _ _ N=N′ (cons≅ W=W′ ρ″=ρ‴) N⇓V
+... | V′ , N′⇓V′ , V=V′ =
+    V′ , (app⇩ ρ′ L′ M′ N′ ρ‴ W′ V′ L′⇓C′ M′⇓W′ N′⇓V′ , V=V′)
+
 
 {-
 {- Having both up and down is problematic -Jeremy -}
