@@ -1,5 +1,7 @@
 open import Data.Nat
+open import Data.Nat.Properties
 open import Data.List
+open import Data.List.Properties
 open import Data.Maybe
 import Relation.Binary.PropositionalEquality as Eq
 open Eq using (_≡_; _≢_; refl; sym; trans; cong; cong₂; cong-app; subst)
@@ -36,6 +38,24 @@ get : ∀{V : Set} → ℕ → List V → Maybe V
 get n [] = nothing
 get zero (v ∷ ρ) = just v
 get (suc n) (v ∷ ρ) = get n ρ
+
+get-append-front : ∀ {T : Set} (xs ys : List T) i
+  → i < length xs
+  → get i (xs ++ ys) ≡ get i xs
+get-append-front (x ∷ xs) ys zero lt = refl
+get-append-front (x ∷ xs) ys (suc i) (s≤s lt) = get-append-front xs ys i lt
+
+get-append-back : ∀ {T : Set} (xs ys : List T) i
+  → get (length xs + i) (xs ++ ys) ≡ get i ys
+get-append-back [] ys i = refl
+get-append-back (x ∷ xs) ys i = get-append-back xs ys i
+
+gets : ∀{V : Set} → List ℕ → List V → List V
+gets [] ρ = []
+gets (x ∷ xs) ρ
+    with get x ρ
+... | nothing = gets xs ρ
+... | just V = V ∷ gets xs ρ
 
 _then_ : ∀{V W : Set} → Result V → (V → Result W) → Result W
 r then f
@@ -142,12 +162,16 @@ data _⊢_⇩_ where
 
 data _⊢_⟱_ where
   empty⟱ : ∀ ρ → ρ ⊢ [] ⟱ []
-  cons⟱ : ∀ ρ M Ms V Vs
+  cons⟱ : ∀ {ρ M Ms V Vs}
     → ρ ⊢ M ⇩ V
     → ρ ⊢ Ms ⟱ Vs
     → ρ ⊢ (M ∷ Ms) ⟱ (V ∷ Vs)
 
 {-------------------- Closure Conversion (Easy Version) -----------------------}
+
+varsRange : ℕ → ℕ → List IL
+varsRange start zero = []
+varsRange start (suc num) = ` start ∷ varsRange (suc start) num
 
 varsTo : ℕ → List IL
 varsTo zero = []
@@ -156,7 +180,7 @@ varsTo (suc n) = ` n ∷ varsTo n
 CC : Term → ℕ → IL
 CC unit n = unit
 CC (` x) n = ` x
-CC (ƛ M) n = (δ (CC M (suc n))) • (varsTo n)
+CC (ƛ M) n = (δ (CC M (suc n))) • (varsRange 0 n)
 CC (L · M) n = (CC L n) · (CC M n)
 
 
@@ -190,7 +214,9 @@ data _≅_ : List Val → List ILVal → Set
 data _⊢_≋_ where
   unit≋ : ∀ {n} → n ⊢ unit ≋ unit
   var≋ : ∀ {n x} → n ⊢ (` x) ≋ (` x)
-  lam≋ : ∀ {n N N′} → n ⊢ (ƛ N) ≋ ((δ N′) • (varsTo n))
+  lam≋ : ∀ {n N N′}
+    → suc n ⊢ N ≋ N′
+    → n ⊢ (ƛ N) ≋ ((δ N′) • (varsRange 0 n))
   app≋ : ∀ {n L L′ M M′}
     → n ⊢ L ≋ L′
     → n ⊢ M ≋ M′
@@ -199,7 +225,7 @@ data _⊢_≋_ where
 data _≈_ where
   vunit≈ : vunit ≈ vunit
   clos≈ : ∀ N ρ N′ ρ′
-     → length ρ ⊢ N ≋ N′
+     → suc (length ρ) ⊢ N ≋ N′
      → ρ ≅ ρ′
      → (clos N ρ) ≈ (clos N′ ρ′) 
 
@@ -211,14 +237,14 @@ data _≅_ where
     → (V ∷ Vs) ≅ (W ∷ Ws)
 
 
-lookupSomething : ∀ ρ ρ′ x V
+lookupSomething : ∀ {ρ ρ′ x V}
   → ρ ≅ ρ′
   → get x ρ ≡ just V
   → ∃[ W ] get x ρ′ ≡ just W × V ≈ W
-lookupSomething (V ∷ ρ) (W ∷ ρ′) zero V (cons≅ V≈W ρ≅ρ′) refl =
+lookupSomething {V ∷ ρ} {W ∷ ρ′} {zero} {V} (cons≅ V≈W ρ≅ρ′) refl =
   W , (refl , V≈W)
-lookupSomething (V ∷ ρ) (W ∷ ρ′) (suc x) V′ (cons≅ V≈W ρ≅ρ′) ρxV =
-  lookupSomething ρ ρ′ x V′ ρ≅ρ′ ρxV
+lookupSomething {V ∷ ρ} {W ∷ ρ′} {suc x} {V′} (cons≅ V≈W ρ≅ρ′) ρxV =
+  lookupSomething ρ≅ρ′ ρxV
 
 lookupNothing : ∀ ρ ρ′ x 
   → ρ ≅ ρ′
@@ -232,8 +258,130 @@ lookupNothing (V ∷ ρ) (W ∷ ρ′) (suc x) (cons≅ V≈W ρ≅ρ′) ρxV =
 compileRelated : ∀ M n → n ⊢ M ≋ CC M n
 compileRelated unit n = unit≋
 compileRelated (` x) n = var≋
-compileRelated (ƛ M) n = lam≋
+compileRelated (ƛ M) n = lam≋ (compileRelated M (suc n))
 compileRelated (L · M) n = app≋ (compileRelated L n) (compileRelated M n)
+
+length-≅ : ∀ {ρ ρ′} → ρ ≅ ρ′ → length ρ ≡ length ρ′
+length-≅ {.[]} {.[]} empty≅ = refl
+length-≅ {.(_ ∷ _)} {.(_ ∷ _)} (cons≅ x ρ=ρ′) = cong suc (length-≅ ρ=ρ′)
+
+lookupInScope : ∀ {V : Set} x (ρ : List V)
+  → x < length ρ
+  → ∃[ V ] get x ρ ≡ just V
+lookupInScope zero (V ∷ ρ) x<ρ = V , refl
+lookupInScope (suc x) (V ∷ ρ) (s≤s x<ρ) = lookupInScope x ρ x<ρ
+
+{-
+evalVars : ∀ n ρ
+  → n ≤ length ρ
+  → ρ ⊢ varsTo n ⟱ gets (downFrom n) ρ
+evalVars zero ρ n<ρ = empty⟱ ρ
+evalVars (suc n) ρ n<ρ
+    with lookupInScope n ρ n<ρ
+... | W , eq rewrite eq =
+  let IH = evalVars n ρ (≤-trans (≤-step ≤-refl) n<ρ) in
+  cons⟱ (var⇩ ρ n W eq) IH
+
+gets-downFrom : ∀ {V : Set} (ρ : List V)
+  → gets (downFrom (length ρ)) ρ ≡ ρ
+gets-downFrom [] = refl
+gets-downFrom (V ∷ ρ)
+    with lookupInScope (length ρ) (V ∷ ρ) (s≤s ≤-refl)
+... | V′ , eq rewrite eq =
+  let IH = gets-downFrom ρ in
+  {!!}
+
+-- gets (downFrom (length (V ∷ ρ))) (V ∷ ρ) ≡ V ∷ ρ
+
+≅-gets : ∀ {ρ ρ′}
+  → ρ ≅ ρ′
+  → ρ ≅ gets (downFrom (length ρ′)) ρ′
+≅-gets {.[]} {.[]} empty≅ = empty≅
+≅-gets {V ∷ ρ} {W ∷ ρ′} (cons≅ V=W ρ=ρ′) =
+--  let IH : ρ ≅ gets (downFrom (length ρ)) ρ′
+--      IH = ≅-gets {ρ}{ρ′} ρ=ρ′ in
+  {!!}
+  -}
+
+{-
+dropSome : ∀ {T : Set} (ρ : List T) n
+  → n < length ρ
+  → ∃[ V ] drop n ρ ≡ V ∷ drop (suc n) ρ
+dropSome (V ∷ ρ) zero (s≤s lt) = V , refl
+dropSome (V ∷ ρ) (suc n) (s≤s lt) 
+    with dropSome ρ n lt
+... | V , eq1 rewrite eq1 = V , refl
+-}
+
+evalVarsAux : ∀ (xs ys : ILEnv) num
+  → num ≤ length ys
+  → (xs ++ ys) ⊢ varsRange (length xs) num ⟱ take num ys
+evalVarsAux xs ys zero lt = empty⟱ (xs ++ ys)
+evalVarsAux xs (y ∷ ys) (suc num) (s≤s lt) rewrite sym (++-assoc xs (y ∷ []) ys)
+   with  evalVarsAux (xs ++ (y ∷ [])) ys num lt
+... | IH rewrite length-++ xs {y ∷ []} | +-comm (length xs) 1 =
+  cons⟱ (var⇩ ((xs ++ y ∷ []) ++ ys) (length xs) y get-y) IH
+  where
+  LT : length xs < length (xs ++ y ∷ [])
+  LT rewrite length-++ xs {y ∷ []} | +-comm (length xs) 1 = s≤s ≤-refl
+
+  get-y : get (length xs) ((xs ++ y ∷ []) ++ ys) ≡ just y
+  get-y rewrite get-append-front (xs ++ y ∷ []) ys (length xs) LT | sym (+-identityʳ (length xs)) =
+    get-append-back xs (y ∷ []) 0
+
+evalVars : ∀ (ρ : ILEnv) num
+  → num ≤ length ρ
+  → ρ ⊢ varsRange 0 num ⟱ take num ρ
+evalVars ρ num lt = evalVarsAux [] ρ num lt 
+
+
+
+
+{-
+evalVars ρ start zero lt = empty⟱ ρ
+evalVars [] start (suc num) lt
+    rewrite (+-suc start num)
+    with lt
+... | ()  
+evalVars (V ∷ ρ) start (suc num) lt
+    rewrite (+-suc start num)
+    with lt
+... | s≤s lt2
+    with start
+... | 0 =
+    let IH = evalVars (V ∷ ρ) 1 num lt in
+    cons⟱ (var⇩ (V ∷ ρ) zero V refl) IH
+... | suc start′
+    with dropSome ρ start′ (≤-trans (s≤s (m≤m+n _ _)) lt2)
+... | V , eq1 rewrite eq1 =
+    cons⟱ (var⇩ {!!} {!!} V {!!}) {!!}
+-}
+
+take-length : ∀ {T : Set} (xs : List T)
+  → take (length xs) xs ≡ xs
+take-length [] = refl
+take-length (x ∷ xs) = cong (λ X → x ∷ X) (take-length xs)
+
+evalRelated : ∀ M M′ ρ ρ′ V
+  → length ρ ⊢ M ≋ M′
+  → ρ ≅ ρ′
+  → ρ ⊢ M ⇓ V
+  → ∃[ W ] ρ′ ⊢ M′ ⇩ W × V ≈ W
+evalRelated .unit .unit ρ ρ′ .vunit unit≋ ρ=ρ′ (unit⇓ .ρ) = vunit , (unit⇩ ρ′ , vunit≈)
+evalRelated .(` x) .(` x) ρ ρ′ V var≋ ρ=ρ′ (var⇓ .ρ x .V eq)
+    with lookupSomething ρ=ρ′ eq
+... | W , eq2 , V=W = W , ((var⇩ ρ′ x W eq2) , V=W)  
+evalRelated .(ƛ N) .(δ _ • varsRange 0 n) ρ ρ′ .(clos N ρ) (lam≋{n}{N}{N′} N=N′) ρ=ρ′ (lam⇓ .ρ N) =
+  clos N′ ρ′ ,
+  clos⇩ ρ′ (δ N′) N′ (varsRange zero (length ρ)) ρ′ (delta⇩ ρ′ N′) Goal1 ,
+  clos≈ N ρ N′ ρ′ N=N′ ρ=ρ′
+  where
+  Goal1 : ρ′ ⊢ varsRange 0 (length ρ) ⟱ ρ′
+  Goal1 rewrite length-≅ ρ=ρ′
+      with evalVars ρ′ (length ρ′) ≤-refl 
+  ... | EV rewrite take-length ρ′ = EV
+  
+evalRelated .(L · M) M′ ρ ρ′ V M=M′ ρ=ρ′ (app⇓ .ρ L M N ρ′₁ W .V M⇓V M⇓V₁ M⇓V₂) = {!!}
 
 {-
 {- Having both up and down is problematic -Jeremy -}
