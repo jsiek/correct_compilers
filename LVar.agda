@@ -110,9 +110,8 @@ rco : Exp → Mon
 rco (Num x) = Atom (Num x)
 rco Read = Read
 rco (Sub e₁ e₂) =
-   let m₁ = rco e₁ in
-   let m₂ = rco e₂ in
-   Let m₁ (Let (shift-mon m₂ zero) (Sub (Var (suc (zero))) (Var zero)))
+   Let (rco e₁)
+   (Let (shift-mon (rco e₂) zero) (Sub (Var (suc (zero))) (Var zero)))
 rco (Var i) = Atom (Var i)
 rco (Let e₁ e₂) = Let (rco e₁) (rco e₂)
 
