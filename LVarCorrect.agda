@@ -65,23 +65,24 @@ interp-shift-mon : ∀ (m : Mon) (v : ℤ) (ρ₁ : Env) (ρ₂ : Env)
     ≡ interp-mon m (ρ₁ ++ ρ₂)
 interp-shift-mon (Atom a) v ρ₁ ρ₂ = interp-shift-atm a v ρ₁ ρ₂
 interp-shift-mon Read v ρ₁ ρ₂ = refl
-interp-shift-mon (Sub a₁ a₂) v ρ₁ ρ₂  = extensionality2 Goal
-  where
-  Goal : (i : ℕ) (f : ℕ → ℤ) →
-      (interp-atm (shift-atm a₁ (length ρ₁)) (ρ₁ ++ v ∷ ρ₂) then
-       (λ v₁ → interp-atm (shift-atm a₂ (length ρ₁)) (ρ₁ ++ v ∷ ρ₂) then
-       (λ v₂ → return (v₁ - v₂)))) i f
-      ≡ (interp-atm a₁ (ρ₁ ++ ρ₂) then
-        (λ v₁ → interp-atm a₂ (ρ₁ ++ ρ₂) then (λ v₂ → return (v₁ - v₂)))) i f
-  Goal i f
-      rewrite interp-shift-atm a₁ v ρ₁ ρ₂
-      | interp-shift-atm a₂ v ρ₁ ρ₂ 
-      with interp-atm a₁ (ρ₁ ++ ρ₂) i f
-  ... | nothing , i' , f' = refl
-  ... | just v₁ , i' , f'
-      with interp-atm a₂ (ρ₁ ++ ρ₂) i' f'
-  ... | nothing , i'' , f'' = refl
-  ... | just v₂ , i'' , f'' = refl
+interp-shift-mon (Sub a₁ a₂) v ρ₁ ρ₂ 
+    rewrite interp-shift-atm a₁ v ρ₁ ρ₂ | interp-shift-atm a₂ v ρ₁ ρ₂ =
+    extensionality2 Goal
+    where
+    Goal : (i : ℕ) (f : ℕ → ℤ) →
+      ((interp-atm a₁ (ρ₁ ++ ρ₂) then
+        (λ v₁ i f → (interp-atm a₂ (ρ₁ ++ ρ₂) then
+        (λ v₂ i₁ f₁ → just (v₁ Data.Integer.+ - v₂) , i₁ , f₁)) i f)) i f)
+      ≡  ((interp-atm a₁ (ρ₁ ++ ρ₂) then
+         (λ v₁ i f → (interp-atm a₂ (ρ₁ ++ ρ₂) then
+         (λ v₂ i₁ f₁ → just (v₁ Data.Integer.+ - v₂) , i₁ , f₁)) i f)) i f)
+    Goal i f
+        with interp-atm a₁ (ρ₁ ++ ρ₂) i f
+    ... | nothing , i' , f' = refl
+    ... | just v₁ , i' , f'
+        with interp-atm a₂ (ρ₁ ++ ρ₂) i' f'
+    ... | nothing , i'' , f'' = refl
+    ... | just v₂ , i'' , f'' = refl
 interp-shift-mon (Let m₁ m₂) v ρ₁ ρ₂ 
   rewrite interp-shift-mon m₁ v ρ₁ ρ₂ = extensionality2 Goal
   where
@@ -94,7 +95,7 @@ interp-shift-mon (Let m₁ m₂) v ρ₁ ρ₂
   ... | nothing , i' , f' = refl
   ... | just v₁ , i' , f'
       rewrite interp-shift-mon m₂ v (v₁ ∷ ρ₁) ρ₂ =
-     refl
+      refl
 
 rco-correct : ∀ (e : Exp) (ρ : Env)
   → interp-mon (rco e) ρ ≡ interp e ρ
