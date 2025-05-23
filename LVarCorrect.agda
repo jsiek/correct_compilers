@@ -33,69 +33,63 @@ eq-true-top {P} eq rewrite eq = tt
 eq-false-not-top : ∀{P} → P ≡ false → ¬ Data.Bool.T P
 eq-false-not-top {P} eq rewrite eq = λ {()}
 
-interp-shift-atm : ∀ (a : Atm) (v : ℤ) (ρ₁ : Env) (ρ₂ : Env) (i : ℕ) (f : ℕ → ℤ)
-  → interp-atm (shift-atm a (length ρ₁)) (ρ₁ ++ v ∷ ρ₂) i f
-    ≡ interp-atm a (ρ₁ ++ ρ₂) i f
-interp-shift-atm (Num x) v ρ₁ ρ₂ i f = refl
-interp-shift-atm (Var x) v ρ₁ ρ₂ i f
-    with (length ρ₁) ≤ᵇ x in lt
-... | true
-    rewrite nth-++-≤ ρ₁ ρ₂ x (≤ᵇ⇒≤ (length ρ₁) x (eq-true-top lt))
-    | nth-++-≤ ρ₁ (v ∷ ρ₂) (suc x) (≤-trans ((≤ᵇ⇒≤ (length ρ₁) x (eq-true-top lt))) (n≤1+n x))
-    | +-∸-assoc 1 {x}{length ρ₁} (≤ᵇ⇒≤ (length ρ₁) x (eq-true-top lt)) =
-      refl
-... | false
-    rewrite nth-++-< ρ₁ ρ₂ x (≰⇒> λ x₁ → (eq-false-not-top lt) (≤⇒≤ᵇ x₁))
-    | nth-++-< ρ₁ (v ∷ ρ₂) x ((≰⇒> λ x₁ → (eq-false-not-top lt) (≤⇒≤ᵇ x₁))) =
-   refl  
-
 postulate
   extensionality2 : ∀ {A B C : Set} {f g : A → B → C}
     → (∀ (x : A) (y : B) → f x y ≡ g x y)
       -----------------------------------
     → f ≡ g
 
-interp-shift-atm-ext : ∀ (a : Atm) (v : ℤ) (ρ₁ : Env) (ρ₂ : Env)
+interp-shift-atm : ∀ (a : Atm) (v : ℤ) (ρ₁ : Env) (ρ₂ : Env)
   → interp-atm (shift-atm a (length ρ₁)) (ρ₁ ++ v ∷ ρ₂) 
     ≡ interp-atm a (ρ₁ ++ ρ₂) 
-interp-shift-atm-ext a v ρ₁ ρ₂ = extensionality2 H
+interp-shift-atm a v ρ₁ ρ₂ = extensionality2 (Goal a)
   where
-  H : (i : ℕ) (f : ℕ → ℤ) →
+  Goal : (a : Atm )(i : ℕ) (f : ℕ → ℤ) →
       interp-atm (shift-atm a (length ρ₁)) (ρ₁ ++ v ∷ ρ₂) i f ≡
       interp-atm a (ρ₁ ++ ρ₂) i f
-  H i f = interp-shift-atm a v ρ₁ ρ₂ i f
+  Goal (Num x) i f = refl
+  Goal (Var x) i f
+      with (length ρ₁) ≤ᵇ x in lt
+  ... | true
+      rewrite nth-++-≤ ρ₁ ρ₂ x (≤ᵇ⇒≤ (length ρ₁) x (eq-true-top lt))
+      | nth-++-≤ ρ₁ (v ∷ ρ₂) (suc x) (≤-trans ((≤ᵇ⇒≤ (length ρ₁) x (eq-true-top lt))) (n≤1+n x))
+      | +-∸-assoc 1 {x}{length ρ₁} (≤ᵇ⇒≤ (length ρ₁) x (eq-true-top lt)) =
+        refl
+  ... | false
+      rewrite nth-++-< ρ₁ ρ₂ x (≰⇒> λ x₁ → (eq-false-not-top lt) (≤⇒≤ᵇ x₁))
+      | nth-++-< ρ₁ (v ∷ ρ₂) x ((≰⇒> λ x₁ → (eq-false-not-top lt) (≤⇒≤ᵇ x₁))) =
+     refl  
 
 interp-shift-mon : ∀ (m : Mon) (v : ℤ) (ρ₁ : Env) (ρ₂ : Env)
   → interp-mon (shift-mon m (length ρ₁)) (ρ₁ ++ (v ∷ ρ₂))
     ≡ interp-mon m (ρ₁ ++ ρ₂)
-interp-shift-mon (Atom a) v ρ₁ ρ₂ = interp-shift-atm-ext a v ρ₁ ρ₂
+interp-shift-mon (Atom a) v ρ₁ ρ₂ = interp-shift-atm a v ρ₁ ρ₂
 interp-shift-mon Read v ρ₁ ρ₂ = refl
-interp-shift-mon (Sub a₁ a₂) v ρ₁ ρ₂  = extensionality2 H
+interp-shift-mon (Sub a₁ a₂) v ρ₁ ρ₂  = extensionality2 Goal
   where
-  H : (i : ℕ) (f : ℕ → ℤ) →
+  Goal : (i : ℕ) (f : ℕ → ℤ) →
       (interp-atm (shift-atm a₁ (length ρ₁)) (ρ₁ ++ v ∷ ρ₂) then
        (λ v₁ → interp-atm (shift-atm a₂ (length ρ₁)) (ρ₁ ++ v ∷ ρ₂) then
        (λ v₂ → return (v₁ - v₂)))) i f
       ≡ (interp-atm a₁ (ρ₁ ++ ρ₂) then
         (λ v₁ → interp-atm a₂ (ρ₁ ++ ρ₂) then (λ v₂ → return (v₁ - v₂)))) i f
-  H i f
-      rewrite interp-shift-atm-ext a₁ v ρ₁ ρ₂
-      | interp-shift-atm-ext a₂ v ρ₁ ρ₂ 
+  Goal i f
+      rewrite interp-shift-atm a₁ v ρ₁ ρ₂
+      | interp-shift-atm a₂ v ρ₁ ρ₂ 
       with interp-atm a₁ (ρ₁ ++ ρ₂) i f
   ... | nothing , i' , f' = refl
   ... | just v₁ , i' , f'
       with interp-atm a₂ (ρ₁ ++ ρ₂) i' f'
   ... | nothing , i'' , f'' = refl
   ... | just v₂ , i'' , f'' = refl
-
 interp-shift-mon (Let m₁ m₂) v ρ₁ ρ₂ 
-  rewrite interp-shift-mon m₁ v ρ₁ ρ₂ = extensionality2 G
+  rewrite interp-shift-mon m₁ v ρ₁ ρ₂ = extensionality2 Goal
   where
-  G : (i : ℕ) (f : ℕ → ℤ) →
+  Goal : (i : ℕ) (f : ℕ → ℤ) →
        ((interp-mon m₁ (ρ₁ ++ ρ₂) then
         (λ v₁ → interp-mon (shift-mon m₂ (suc (foldr (λ _ → suc) 0 ρ₁))) (v₁ ∷ ρ₁ ++ v ∷ ρ₂)))) i f
          ≡ ((interp-mon m₁ (ρ₁ ++ ρ₂) then (λ v₁ → interp-mon m₂ (v₁ ∷ ρ₁ ++ ρ₂)))) i f
-  G i f
+  Goal i f
       with interp-mon m₁ (ρ₁ ++ ρ₂) i f
   ... | nothing , i' , f' = refl
   ... | just v₁ , i' , f'
