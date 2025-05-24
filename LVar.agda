@@ -9,31 +9,12 @@ open import Data.Maybe
 open import Relation.Binary.PropositionalEquality
    using (_≡_; refl; trans; sym; cong; cong-app)
 open import Agda.Builtin.Bool
+open import Reader
 
 ----------------- Variables ----------------------------
 
 Id : Set
 Id = ℕ
-
------------------ Reader (ish) Monad ----------------------------
-
-Reader : Set → Set
-Reader A = ℕ → (ℕ → A) → (Maybe A) × ℕ × (ℕ → A)
-
-read : ∀{A} → Reader A
-read i f = just (f i) , suc i , f
-
-return : ∀{A : Set} → A → Reader A
-return a i f = just a , i , f
-
-yield : ∀{A : Set} → Maybe A → Reader A
-yield a i f = a , i , f
-
-_then_ : ∀{A} → Reader A → (A → Reader A) → Reader A
-(M then g) i f
-    with M i f
-... | nothing , i' , f' = nothing , i' , f'
-... | just v , i' , f' = g v i' f'
 
 ----------------- Definition of LVar ----------------------------
 
@@ -59,7 +40,7 @@ interp (Sub e₁ e₂) ρ =
   (interp e₁ ρ) then
   λ v₁ → (interp e₂ ρ) then
   λ v₂ → return (Data.Integer._-_ v₁ v₂)
-interp (Var i) ρ = yield (nth ρ i)
+interp (Var i) ρ = try (nth ρ i)
 interp (Let e₁ e₂) ρ =
   (interp e₁ ρ) then
   λ v₁ → interp e₂ (v₁ ∷ ρ)
@@ -78,7 +59,7 @@ data Mon : Set where
 
 interp-atm : Atm → Env → Reader ℤ
 interp-atm (Num n) ρ = return n
-interp-atm (Var i) ρ = yield (nth ρ i)
+interp-atm (Var i) ρ = try (nth ρ i)
 
 interp-mon : Mon → Env → Reader ℤ
 interp-mon (Atom atm) ρ = interp-atm atm ρ

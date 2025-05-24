@@ -14,6 +14,7 @@ open import Agda.Builtin.Bool
 open import Relation.Nullary.Negation.Core using (¬_; contradiction)
 
 open import LVar
+open import Reader
 
 nth-++-< : ∀{A : Set} → (xs ys : List A) (x : ℕ)
        → x < length xs
