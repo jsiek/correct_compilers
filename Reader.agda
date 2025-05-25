@@ -54,6 +54,14 @@ effect {A} M s (good not-noth)
 ... | nothing = ⊥-elim (not-noth refl)
 ... | just (v , s') = s'
 
+
+-- Proof pattern for using succeed-or-fail and succeed-val-eff:
+-- 
+--     with succeed-or-fail M s
+-- ... | inj₂ eq-noth rewrite eq-noth = ?
+-- ... | inj₁ g
+--     rewrite succeed-val-eff M s g = ?
+
 succeed-or-fail : ∀{A} (M : Reader A) (s : StateR A)
   → (Succeed A M s) ⊎ M s ≡ nothing
 succeed-or-fail{A} M s
