@@ -48,8 +48,8 @@ interp-shift-atm : ∀ (a : Atm) (v : ℤ) (ρ₁ : Env) (ρ₂ : Env)
 interp-shift-atm a v ρ₁ ρ₂ = extensionality (Goal a)
   where
   Goal : (a : Atm )(s : StateR ℤ) →
-      interp-atm (shift-atm a (length ρ₁)) (ρ₁ ++ v ∷ ρ₂) s ≡
-      interp-atm a (ρ₁ ++ ρ₂) s
+        interp-atm (shift-atm a (length ρ₁)) (ρ₁ ++ v ∷ ρ₂) s
+      ≡ interp-atm a (ρ₁ ++ ρ₂) s
   Goal (Num x) s = refl
   Goal (Var x) s
       with (length ρ₁) ≤ᵇ x in lt
