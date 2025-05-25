@@ -1,0 +1,33 @@
+<p>The <span class="math inline">ℒ<sub>Var</sub></span> language</p>
+<p>remove complex operands</p>
+<h1 id="monad-for-reading-input-and-errors">Monad for Reading Input and
+Errors</h1>
+<p><span class="math display">$$\begin{aligned}
+\mathsf{State}\,A &amp;= \mathbb{N} \times (\mathbb{N} \to A) \\
+\mathsf{Reader}\,A &amp;= \mathsf{State}\,A \to \mathsf{Maybe}\,(A
+\times \mathsf{State}\,A)
+\end{aligned}$$</span></p>
+<p><span class="math display">$$\begin{aligned}
+\mathsf{read} \,(i , f) &amp;= \mathsf{just}\,(f\,i , i + 1 , f)
+\end{aligned}$$</span></p>
+<p><span class="math display">$$\begin{aligned}
+\mathsf{return}\,a \,s = \mathsf{just}\,(a , s)
+\end{aligned}$$</span></p>
+<p><span class="math display">$$\begin{aligned}
+\mathsf{try}\,(\mathsf{just}\,x)\,s = \mathsf{just}\,(x , s) \\
+\mathsf{try}\,\mathsf{nothing}{}\,s = \mathsf{nothing}{}
+\end{aligned}$$</span></p>
+<p><span class="math display">$$\begin{aligned}
+(M \,\mathsf{then}\,g) \,s &amp; =
+\begin{cases}
+\mathsf{nothing}{} &amp; \text{if } M\,s = \mathsf{nothing}{} \\
+g\,v\,s' &amp; \text{if } M\,s = \mathsf{just}\,(v,s')
+\end{cases}
+\end{aligned}$$</span></p>
+<p><span class="math display">$$\begin{aligned}
+(M_1 ;  M_2) \,s &amp;=
+\begin{cases}
+\mathsf{nothing}{} &amp; \text{if } M_1\,s = \mathsf{nothing}{} \\
+M_2\,s' &amp; \text{if } M_1\,s = \mathsf{just}\,(v , s')
+\end{cases}
+\end{aligned}$$</span></p>

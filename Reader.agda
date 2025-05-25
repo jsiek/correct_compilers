@@ -7,94 +7,69 @@ open import Data.Maybe
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality
-   using (_≡_; refl; trans; sym; cong; cong-app)
+   using (_≡_; _≢_; refl; trans; sym; cong; cong-app)
 
 ----------------- Reader (ish) Monad ----------------------------
 
-abstract
-  StateR : Set → Set
-  StateR A = ℕ × (ℕ → A)
+StateR : Set → Set
+StateR A = ℕ × (ℕ → A)
 
 Reader : Set → Set
 Reader A = StateR A → Maybe (A × StateR A)
 
-abstract
-  read : ∀{A} → Reader A
-  read (i , f) = just (f i , suc i , f)
+_then_ : ∀{A : Set} → Reader A → (A → Reader A) → Reader A
+(M then g) s
+    with M s
+... | nothing = nothing
+... | just (v , s') = g v s'
 
-  return : ∀{A : Set} → A → Reader A
-  return a s = just (a , s)
+read : ∀{A} → Reader A
+read (i , f) = just (f i , suc i , f)
 
-  try : ∀{A : Set} → Maybe A → Reader A
-  try (just x) s = just (x , s)
-  try nothing (i , s) = nothing
+return : ∀{A : Set} → A → Reader A
+return a s = just (a , s)
 
-  _then_ : ∀{A : Set} → Reader A → (A → Reader A) → Reader A
-  (M then g) s
-      with M s
-  ... | nothing = nothing
-  ... | just (v , s') = g v s'
+try : ∀{A : Set} → Maybe A → Reader A
+try (just x) s = just (x , s)
+try nothing s = nothing
 
-  _⨟_ : ∀{A : Set} → Reader A → Reader A → Reader A
-  (M₁ ⨟ M₂) s
-      with M₁ s
-  ... | nothing = nothing
-  ... | just (v , s') = M₂ s'
+_⨟_ : ∀{A : Set} → Reader A → Reader A → Reader A
+(M₁ ⨟ M₂) s
+    with M₁ s
+... | nothing = nothing
+... | just (v , s') = M₂ s'
 
-  try-just : ∀{A : Set} (v : A)
-      → try (just v) ≡ return v
-  try-just {A} v = refl
+data Succeed (A : Set) : (Reader A) → (StateR A) → Set where
+  good : ∀ {M s} → M s ≢ nothing → Succeed A M s
 
-  ret-then : ∀{A : Set} → (v : A) → (f : A → Reader A)
-           → (return v) then f ≡ f v
-  ret-then {A} v f = refl
+value : ∀ {A : Set} (M : Reader A) (s : StateR A) → (Succeed A M s) → A
+value {A} M s (good not-noth)
+    with M s
+... | nothing = ⊥-elim (not-noth refl)
+... | just (v , s') = v
 
-  _returns_ : ∀{A} → Reader A → A → StateR A → Set
-  (M returns v) s
-      with M s
-  ... | just (v' , s') = v ≡ v'
-  ... | nothing = ⊥
+effect : ∀ {A : Set} (M : Reader A) (s : StateR A) → (Succeed A M s) → StateR A
+effect {A} M s (good not-noth)
+    with M s
+... | nothing = ⊥-elim (not-noth refl)
+... | just (v , s') = s'
 
-  fails : ∀{A : Set} → Reader A → StateR A → Set
-  fails M s
-      with M s
-  ... | just (v' , s') = ⊥
-  ... | nothing = ⊤
-
-  return-or-fail : ∀{A : Set} (M : Reader A) (s : StateR A)
-    → (Σ[ v ∈ A ] (M returns v) s) ⊎ (fails M s)
-  return-or-fail{A} M s
-      with M s
-  ... | nothing = inj₂ tt
-  ... | just (v , s') = inj₁ (v , refl)
-
-  ret-then-seq : ∀{A} {M₁ : Reader A} {v : A}{s : StateR A}
-    → (M₁ returns v) s
-    → (g : A → Reader A)
-    → (M₁ then g) s ≡ (M₁ ⨟ g v) s
-  ret-then-seq {A}{M₁}{v}{s} M₁v g 
-      with M₁ s
-  ... | nothing = refl
-  ... | just (v , s')
-      with M₁v
-  ... | refl = refl
-
-  fail-then : ∀{A}{s}
-     → (M₁ : Reader A)
-    → (fails M₁) s
-    → (g : A → Reader A)
-    → (M₁ then g) s ≡ M₁ s
-  fail-then {A}{s} M₁ M₁v g 
-      with M₁ s
-  ... | nothing = refl
-  ... | just (v , s')
-      with M₁v
+succeed-or-fail : ∀{A} (M : Reader A) (s : StateR A)
+  → (Succeed A M s) ⊎ M s ≡ nothing
+succeed-or-fail{A} M s
+    with M s in eq
+... | nothing = inj₂ refl
+... | just (v , s') = inj₁ (good λ {x → contra{A}{M} x eq})
+  where
+  contra : ∀{A}{M : Reader A}{ s s' v}
+         → (M s ≡ nothing) → (M s ≡ just (v , s')) → ⊥
+  contra a b rewrite b
+      with a
   ... | ()
 
-  seq-same-start : ∀{A}{s : StateR A} (M₁ : Reader A) {M₂ M₃}
-    → (∀ (s' : StateR A) → M₂ s' ≡ M₃ s')
-    → (M₁ ⨟ M₂) s ≡ (M₁ ⨟ M₃) s
-  seq-same-start {A}{s} M₁ M23
-      with M₁ s
-  ... | just (v , s') = M23 s'
-  ... | nothing = refl
+succeed-val-eff : ∀ {A : Set} (M : Reader A) (s : StateR A) → (g : Succeed A M s)
+  → M s ≡ just (value M s g , effect M s g)
+succeed-val-eff M s (good not-noth)
+    with M s
+... | nothing = ⊥-elim (not-noth refl)
+... | just (v , s') = refl
