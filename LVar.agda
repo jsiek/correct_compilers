@@ -132,18 +132,19 @@ shift-tail (Let e t) c = Let (shift-exp e c) (shift-tail t (suc c))
 
 ----------------- Explicate Control ----------------------------
 
-explicate-assign : Mon → CTail → CTail
-explicate-tail : Mon → CTail
+explicate-let : Mon → CTail → CTail
+explicate : Mon → CTail
 
-explicate-assign (Atom x) rest = Let (Atom x) rest  
-explicate-assign Read rest = Let Read rest
-explicate-assign (Sub a₁ a₂) rest = Let (Sub a₁ a₂) rest
-explicate-assign (Let m₁ m₂) rest =
-  let rest' = explicate-assign m₂ (shift-tail rest zero) in
-  explicate-assign m₁ rest'
+explicate-let (Atom x) rest = Let (Atom x) rest  
+explicate-let Read rest = Let Read rest
+explicate-let (Sub a₁ a₂) rest = Let (Sub a₁ a₂) rest
+explicate-let (Let m₁ m₂) rest =
+  -- (Let (Let m₁ m₂) rest) ==> (Let m₁ (Let m₂ rest))
+  let rest' = explicate-let m₂ (shift-tail rest 1) in
+  explicate-let m₁ rest'
 
-explicate-tail (Atom x) = Return (Atom x)
-explicate-tail Read = Return Read
-explicate-tail (Sub a₁ a₂) = Return (Sub a₁ a₂)
-explicate-tail (Let m₁ m₂) = explicate-assign m₁ (explicate-tail m₂)
+explicate (Atom x) = Return (Atom x)
+explicate Read = Return Read
+explicate (Sub a₁ a₂) = Return (Sub a₁ a₂)
+explicate (Let m₁ m₂) = explicate-let m₁ (explicate m₂)
 
