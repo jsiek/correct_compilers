@@ -336,7 +336,7 @@ lower-lets-correct c s = Goal
       = eq
 
   Goal : interp-CVar c s ≡
-      observe
+      run
       (interp-stmt (lower-tail c .proj₁)
        (replicate (lower-tail c .proj₂) 0ℤ))
       s

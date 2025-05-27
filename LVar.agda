@@ -51,7 +51,7 @@ interp-exp (Let e₁ e₂) ρ =
   λ v₁ → interp-exp e₂ (v₁ ∷ ρ)
 
 interp-LVar : Exp → StateR ℤ → Maybe ℤ
-interp-LVar e s = observe (interp-exp e []) s
+interp-LVar e s = run (interp-exp e []) s
 
 ----------------- Definition of LMonVar ----------------------------
 
@@ -81,7 +81,7 @@ interp-mon (Let e₁ e₂) ρ =
   λ v₁ → interp-mon e₂ (v₁ ∷ ρ)
 
 interp-LMonVar : Mon → StateR ℤ → Maybe ℤ
-interp-LMonVar m s = observe (interp-mon m []) s
+interp-LMonVar m s = run (interp-mon m []) s
 
 shift-atm : Atm → ℕ → Atm
 shift-atm (Num x) c = Num x
@@ -133,7 +133,7 @@ interp-tail (Let e t) ρ =
   λ v₁ → interp-tail t (v₁ ∷ ρ)
 
 interp-CVar : CTail → StateR ℤ → Maybe ℤ
-interp-CVar t s = observe (interp-tail t []) s
+interp-CVar t s = run (interp-tail t []) s
 
 shift-exp : CExp → ℕ → CExp
 shift-exp (Atom atm) c = Atom (shift-atm atm c)
@@ -178,7 +178,7 @@ interp-stmt (Assign x e s) ρ =
   (λ v → interp-stmt s (update ρ x v))
 
 interp-prog : CProg → StateR ℤ → Maybe ℤ
-interp-prog (Program n is) s = observe (interp-stmt is (replicate n 0ℤ)) s
+interp-prog (Program n is) s = run (interp-stmt is (replicate n 0ℤ)) s
 
 ----------------- Lower Lets (Explicate Part 2) -------------------
 
