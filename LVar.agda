@@ -171,7 +171,7 @@ interp-stmt (Assign x e s) ρ =
 interp-prog : CProg → Reader ℤ
 interp-prog (Program n s) = interp-stmt s (replicate n 0ℤ)
 
------------------ Lower Lets ----------------------------
+----------------- Lower Lets (Explicate Part 2) -------------------
 
 shifts-atm : Atm → ℕ → ℕ → Atm
 shifts-atm (Num x) c n = Num x
@@ -196,35 +196,64 @@ lower-lets t
     with lower-tail t
 ... | s , n = Program n s
 
--- let x = 1 in
--- let y = x - 1 in
--- let z = x - y in
---   z - x - y
+----------------- Definition of X86Var ----------------------------
 
--- let 1 in
--- let `0 - 1 in
--- let `1 - `0 in
---   `0 - `2 - `1
+data Arg : Set where
+  Num : ℤ → Arg
+  Var : Id → Arg
+  Reg : ℕ → Arg
 
--- program 3
+rax : ℕ
+rax = 0
 
--- (let x = e1 in (let y = e2 in e3)
--- -->
--- let x = 0
--- x := e1;
--- let y = 0
--- y := e2
--- e3
--- -->
--- let x = 0, y = 0 
--- x := shifts e1 0 1;
--- y := e2
--- e3
+data Inst : Set where
+  MovQ : Arg → Arg → Inst
+  SubQ : Arg → Arg → Inst
+  ReadInt : Inst
 
+data X86Var : Set where
+  Program : ℕ → List Inst → X86Var
 
--- -->
--- (let x = 0 in
---  let y = 0 in
---  x := e1;
---  y := e2;
---  return e3)
+StateX86 : Set
+StateX86 = StateR ℤ × List ℤ × List ℤ -- input + registers + variables
+
+interp-arg : Arg → StateX86 → Maybe ℤ
+interp-arg (Num i) s = just i
+interp-arg (Var x) (inputs , regs , ρ) = nth ρ x
+interp-arg (Reg x) (inputs , regs , ρ) = nth regs x
+
+write-arg : Arg → ℤ → StateX86 → Maybe StateX86
+write-arg (Num x) v (inputs , regs , ρ) = nothing
+write-arg (Var x) v (inputs , regs , ρ) = just (inputs , regs , update ρ x v)
+write-arg (Reg x) v (inputs , regs , ρ) = just (inputs , update regs x v , ρ)
+
+interp-inst : Inst → StateX86 → Maybe StateX86
+interp-inst (MovQ src dest) s
+    with interp-arg src s
+... | nothing = nothing
+... | just val = write-arg dest val s
+interp-inst (SubQ src dest) s
+    with interp-arg src s
+... | nothing = nothing
+... | just y
+    with interp-arg dest s
+... | nothing = nothing
+... | just x = write-arg dest (x - y) s
+interp-inst ReadInt (inputs , regs , ρ)
+    with read inputs
+... | nothing = nothing  
+... | just (v , inputs') =
+      just (inputs' , update regs rax v , ρ)
+
+interp-insts : List Inst → StateX86 → Maybe StateX86
+interp-insts [] s = just s
+interp-insts (inst ∷ is) s
+    with interp-inst inst s
+... | nothing = nothing
+... | just s' = interp-insts is s'
+
+interp-x86-var : X86Var → (ℕ × (ℕ → ℤ)) → Maybe ℤ
+interp-x86-var (Program n is) inputs
+    with interp-insts is (inputs , [ 0ℤ ] , replicate n 0ℤ)
+... | nothing = nothing
+... | just (inputs , regs , ρ) = nth regs 0
