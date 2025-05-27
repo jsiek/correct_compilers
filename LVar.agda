@@ -3,13 +3,23 @@ module LVar where
 open import Data.Nat using (ℕ; zero; suc; _≤ᵇ_)
 open import Data.Nat.Properties
 open import Data.Product
-open import Data.Integer using (ℤ; -_; _-_)
+open import Data.Integer using (ℤ; -_; _-_; 0ℤ)
 open import Data.List
 open import Data.Maybe
 open import Relation.Binary.PropositionalEquality
    using (_≡_; refl; trans; sym; cong; cong-app)
 open import Agda.Builtin.Bool
 open import Reader
+
+nth : ∀{A : Set} → List A → ℕ → Maybe A
+nth [] i = nothing
+nth (x ∷ xs) zero    = just x
+nth (x ∷ xs) (suc i) = nth xs i
+
+update : ∀{A : Set} → List A → ℕ → A → List A
+update [] i v = []
+update (x ∷ xs) zero v = v ∷ xs
+update (x ∷ xs) (suc i) v = x ∷ update xs i v
 
 ----------------- Variables ----------------------------
 
@@ -27,11 +37,6 @@ data Exp : Set where
 
 Env : Set
 Env = List ℤ
-
-nth : ∀{A : Set} (xs : List A) → ℕ → Maybe A
-nth [] i = nothing
-nth (x ∷ xs) zero    = just x
-nth (x ∷ xs) (suc i) = nth xs i
 
 interp : Exp → Env → Reader ℤ
 interp (Num n) ρ = return n
@@ -148,3 +153,78 @@ explicate Read = Return Read
 explicate (Sub a₁ a₂) = Return (Sub a₁ a₂)
 explicate (Let m₁ m₂) = explicate-let m₁ (explicate m₂)
 
+----------------- Definition of CVar2 ----------------------------
+
+data CStmt : Set where
+  Return : CExp → CStmt
+  Assign : ℕ → CExp → CStmt → CStmt
+
+data CProg : Set where
+  Program : ℕ → CStmt → CProg
+
+interp-stmt : CStmt → Env → Reader ℤ
+interp-stmt (Return e) ρ = interp-exp e ρ
+interp-stmt (Assign x e s) ρ =
+  (interp-exp e ρ) then
+  (λ v → interp-stmt s (update ρ x v))
+
+interp-prog : CProg → Reader ℤ
+interp-prog (Program n s) = interp-stmt s (replicate n 0ℤ)
+
+----------------- Lower Lets ----------------------------
+
+shifts-atm : Atm → ℕ → ℕ → Atm
+shifts-atm (Num x) c n = Num x
+shifts-atm (Var x) c n
+    with c ≤ᵇ x
+... | true = Var (n Data.Nat.+ x)
+... | false = Var x
+
+shifts-exp : CExp → ℕ → ℕ → CExp
+shifts-exp (Atom atm) c n = Atom (shifts-atm atm c n)
+shifts-exp Read c n = Read
+shifts-exp (Sub a₁ a₂) c n = Sub (shifts-atm a₁ c n) (shifts-atm a₂ c n)
+
+lower-tail : CTail → CStmt × ℕ
+lower-tail (Return e) = Return e , 0
+lower-tail (Let e t)
+    with lower-tail t
+... | s , n = Assign n (shifts-exp e 0 (suc n)) s , suc n
+
+lower-lets : CTail → CProg
+lower-lets t
+    with lower-tail t
+... | s , n = Program n s
+
+-- let x = 1 in
+-- let y = x - 1 in
+-- let z = x - y in
+--   z - x - y
+
+-- let 1 in
+-- let `0 - 1 in
+-- let `1 - `0 in
+--   `0 - `2 - `1
+
+-- program 3
+
+-- (let x = e1 in (let y = e2 in e3)
+-- -->
+-- let x = 0
+-- x := e1;
+-- let y = 0
+-- y := e2
+-- e3
+-- -->
+-- let x = 0, y = 0 
+-- x := shifts e1 0 1;
+-- y := e2
+-- e3
+
+
+-- -->
+-- (let x = 0 in
+--  let y = 0 in
+--  x := e1;
+--  y := e2;
+--  return e3)

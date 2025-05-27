@@ -2,12 +2,13 @@ module LVarCorrect where
 
 open import Agda.Builtin.Unit
 open import Data.Bool using ()
-open import Data.Nat using (ℕ; zero; suc; _<_; _≤_; _≤ᵇ_; _∸_)
+open import Data.Nat using (ℕ; zero; suc; _<_; _≤_; _≤ᵇ_; _∸_; _+_; s≤s)
 open import Data.Nat.Properties
 open import Data.Product
 open import Data.Sum
-open import Data.Integer using (ℤ; -_; _-_; _+_)
+open import Data.Integer using (ℤ; -_; _-_; 0ℤ)
 open import Data.List
+open import Data.List.Properties using (++-assoc; length-replicate; ++-identityʳ)
 open import Data.Maybe
 open import Relation.Binary.PropositionalEquality
    using (_≡_; refl; trans; sym; cong; cong-app)
@@ -18,17 +19,53 @@ open import Function.Base using (case_of_; case_returning_of_)
 open import LVar
 open import Reader
 
+update-correct : ∀ {A} (xs ys : List A) (v v' : A)
+  → update (xs ++ v ∷ ys) (length xs) v' ≡ xs ++ v' ∷ ys
+update-correct [] ys v v' = refl
+update-correct (x ∷ xs) ys v v' rewrite update-correct xs ys v v' = refl
+
+++-length : ∀ {A : Set} (xs : List A) (m n : ℕ)
+  → length xs ≡ (m + n)
+  → Σ[ ys ∈ List A ] Σ[ zs ∈ List A ] (xs ≡ ys ++ zs × length ys ≡ m × length zs ≡ n)
+++-length xs zero n len_mn = [] , xs , refl , refl , len_mn
+++-length (x ∷ xs) (suc m) n len_mn
+    with ++-length xs m n (suc-injective len_mn)
+... | ys , zs , refl , refl , refl
+    = x ∷ ys , zs , refl , refl , refl
+
+++-length-+-1 : ∀ {A : Set} (xs : List A) (m : ℕ)
+  → length xs ≡ (m + 1)
+  → Σ[ ys ∈ List A ] Σ[ z ∈ A ] (xs ≡ ys ++ [ z ] × length ys ≡ m)
+++-length-+-1 xs m eq
+    with ++-length xs m 1 eq
+... | ys , z ∷ [] , refl , refl , eq2
+    = ys , z , refl , refl
+
+m≤n⇒-+ : ∀ (m n : ℕ)
+  → m ≤ n
+  → Σ[ l ∈ ℕ ] m + l ≡ n
+m≤n⇒-+ zero n mn = n , refl
+m≤n⇒-+ (suc m) (suc n) (s≤s mn)
+    with m≤n⇒-+ m n mn
+... | l , refl = l , refl
+
 nth-++-< : ∀{A : Set} → (xs ys : List A) (x : ℕ)
        → x < length xs
        → nth (xs ++ ys) x ≡ nth xs x
 nth-++-< {A} (x₁ ∷ xs) ys zero lt = refl
 nth-++-< {A} (x₁ ∷ xs) ys (suc x) (_≤_.s≤s lt) = nth-++-< xs ys x lt
 
+-- TODO: replace uses of nth-++-≤ with nth-++-+
 nth-++-≤ : ∀{A : Set} → (xs ys : List A) (x : ℕ)
        → length xs ≤ x
        → nth (xs ++ ys) x ≡ nth ys (x ∸ length xs)
 nth-++-≤ {A} [] ys x lt = refl
 nth-++-≤ {A} (x₁ ∷ xs) ys (suc x) (_≤_.s≤s lt) = nth-++-≤ xs ys x lt
+
+nth-++-+ : ∀{A : Set} → (xs ys : List A) (n : ℕ)
+       → nth (xs ++ ys) (length xs + n) ≡ nth ys n
+nth-++-+ {A} [] ys n = refl
+nth-++-+ {A} (x ∷ xs) ys n = nth-++-+ xs ys n
 
 eq-true-top : ∀{P} → P ≡ true → Data.Bool.T P
 eq-true-top {P} eq rewrite eq = tt
@@ -202,3 +239,85 @@ explicate-correct (Let m₁ m₂) ρ = extensionality Goal
   ... | just (v₁ , s1)
       rewrite explicate-correct m₂ (v₁ ∷ ρ)
       = refl
+
+--------------- Proof of correctness for Lower Lets ------------------------
+
+interp-shifts-atm : ∀ (a : Atm) (ρ₁ ρ₂ ρ₃ : Env)
+  → interp-atm (shifts-atm a (length ρ₁) (length ρ₂)) (ρ₁ ++ ρ₂ ++ ρ₃)
+  ≡ interp-atm a (ρ₁ ++ ρ₃)
+interp-shifts-atm a ρ₁ ρ₂ ρ₃ = extensionality (Goal a)
+  where
+  Goal : (a : Atm )(s : StateR ℤ)
+       → interp-atm (shifts-atm a (length ρ₁) (length ρ₂)) (ρ₁ ++ ρ₂ ++ ρ₃) s
+        ≡ interp-atm a (ρ₁ ++ ρ₃) s
+  Goal (Num i) s = refl
+  Goal (Var x) s
+      with length ρ₁ ≤ᵇ x in lt
+  ... | true
+      with m≤n⇒-+ (length ρ₁) x (≤ᵇ⇒≤ (length ρ₁) x (eq-true-top lt))
+  ... | k , eq
+      rewrite sym eq
+      | sym (+-assoc (length ρ₂) (length ρ₁) k)
+      | +-comm (length ρ₂) (length ρ₁)
+      | (+-assoc (length ρ₁) (length ρ₂) k)
+      | nth-++-+ ρ₁ (ρ₂ ++ ρ₃) (length ρ₂ + k)
+      | nth-++-+ ρ₂ ρ₃ k
+      | nth-++-+ ρ₁ ρ₃ k
+      = refl
+  Goal (Var x) s | false
+      rewrite nth-++-< ρ₁ (ρ₂ ++ ρ₃) x (≰⇒> λ x₁ → (eq-false-not-top lt) (≤⇒≤ᵇ x₁))
+      | nth-++-< ρ₁ ρ₃ x (≰⇒> λ x₁ → (eq-false-not-top lt) (≤⇒≤ᵇ x₁))
+      = refl
+
+interp-shifts-exp : ∀ (e : CExp) (ρ₁ ρ₂ ρ₃ : Env)
+  → interp-exp (shifts-exp e (length ρ₁) (length ρ₂)) (ρ₁ ++ ρ₂ ++ ρ₃)
+  ≡ interp-exp e (ρ₁ ++ ρ₃)
+interp-shifts-exp (Atom a) ρ₁ ρ₂ ρ₃ = interp-shifts-atm a ρ₁ ρ₂ ρ₃
+interp-shifts-exp Read ρ₁ ρ₂ ρ₃ = refl
+interp-shifts-exp (Sub a₁ a₂) ρ₁ ρ₂ ρ₃ = extensionality Goal
+  where
+  Goal : (s : StateR ℤ)
+    → interp-exp (shifts-exp (Sub a₁ a₂) (length ρ₁) (length ρ₂)) (ρ₁ ++ ρ₂ ++ ρ₃) s
+      ≡ interp-exp (Sub a₁ a₂) (ρ₁ ++ ρ₃) s
+  Goal s
+       rewrite interp-shifts-atm a₁ ρ₁ ρ₂ ρ₃
+       | interp-shifts-atm a₂ ρ₁ ρ₂ ρ₃
+       with interp-atm a₁ (ρ₁ ++ ρ₃) s
+  ... | nothing = refl
+  ... | just (v₁ , s2)
+       with interp-atm a₂ (ρ₁ ++ ρ₃) s2
+  ... | nothing = refl
+  ... | just (v₂ , s3)
+       = refl
+
+lower-tail-correct : ∀ (c : CTail) (ρ₁ ρ₂ : Env)
+  → proj₂ (lower-tail c) ≡ length ρ₁
+  → interp-tail c ρ₂ ≡ interp-stmt (proj₁ (lower-tail c)) (ρ₁ ++ ρ₂)
+lower-tail-correct (Return e) [] ρ₂ eq = refl
+lower-tail-correct (Let e c) ρ₁ ρ₂ eq = extensionality Goal
+  where
+  Goal : (s : StateR ℤ)
+    → (interp-tail (Let e c) ρ₂) s
+    ≡ interp-stmt (proj₁ (lower-tail (Let e c))) (ρ₁ ++ ρ₂) s
+  Goal s 
+      rewrite eq | interp-shifts-exp e [] ρ₁ ρ₂
+      with interp-exp e ρ₂ s
+  ... | nothing = refl
+  ... | just (v , s1)
+      rewrite +-comm 1 (proj₂ (lower-tail c))
+      with ++-length-+-1 ρ₁ (proj₂ (lower-tail c)) (sym eq)
+  ... | r11 , v₂ , refl , eq2
+      rewrite ++-assoc r11 (v₂ ∷ []) ρ₂
+      | sym eq2
+      | update-correct r11 ρ₂ v₂ v
+      | lower-tail-correct c r11 (v ∷ ρ₂) (sym eq2)
+      = refl
+
+lower-lets-correct : ∀ (c : CTail) 
+  → interp-tail c [] ≡ interp-prog (lower-lets c)
+lower-lets-correct c
+    with lower-tail-correct c ((replicate (proj₂ (lower-tail c)) 0ℤ)) []
+              (sym (length-replicate (proj₂ (lower-tail c))))
+... | eq
+     rewrite ++-identityʳ (replicate (proj₂ (lower-tail c)) (ℤ.pos 0))
+    = eq
