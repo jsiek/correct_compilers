@@ -127,53 +127,57 @@ interp-shift-mon (Let m₁ m₂) v ρ₁ ρ₂
       rewrite interp-shift-mon m₂ v (v₁ ∷ ρ₁) ρ₂
       = refl
 
-rco-correct : ∀ (e : Exp) (ρ : Env)
-  → interp-mon (rco e) ρ ≡ interp e ρ
-rco-correct (Num x) ρ = refl
-rco-correct Read ρ = refl
-rco-correct (Sub e₁ e₂) ρ = extensionality Goal
+rco-correct-exp : ∀ (e : Exp) (ρ : Env)
+  → interp-mon (rco e) ρ ≡ interp-exp e ρ
+rco-correct-exp (Num x) ρ = refl
+rco-correct-exp Read ρ = refl
+rco-correct-exp (Sub e₁ e₂) ρ = extensionality Goal
   where
   Goal : (s : StateR ℤ) →
       (interp-mon (rco e₁) ρ then
        (λ v₁ → interp-mon (shift-mon (rco e₂) 0) (v₁ ∷ ρ) then
        (λ v₂ → return (v₁ - v₂)))) s
-      ≡ (interp e₁ ρ then
-        (λ v₁ → interp e₂ ρ then
+      ≡ (interp-exp e₁ ρ then
+        (λ v₁ → interp-exp e₂ ρ then
         (λ v₂ → return (v₁ - v₂)))) s
   Goal s
-      rewrite rco-correct e₁ ρ
-      with interp e₁ ρ s
+      rewrite rco-correct-exp e₁ ρ
+      with interp-exp e₁ ρ s
   ... | nothing = refl
   ... | just (v₁ , s')
       rewrite interp-shift-mon (rco e₂) v₁ [] ρ
-      | rco-correct e₂ ρ
+      | rco-correct-exp e₂ ρ
       = refl
-rco-correct (Var i₁) ρ = refl
-rco-correct (Let e₁ e₂) ρ = extensionality Goal
+rco-correct-exp (Var i₁) ρ = refl
+rco-correct-exp (Let e₁ e₂) ρ = extensionality Goal
   where
   Goal : (s : StateR ℤ) →
         (interp-mon (rco e₁) ρ then (λ v₁ → interp-mon (rco e₂) (v₁ ∷ ρ))) s
-      ≡ (interp e₁ ρ then (λ v₁ → interp e₂ (v₁ ∷ ρ))) s
+      ≡ (interp-exp e₁ ρ then (λ v₁ → interp-exp e₂ (v₁ ∷ ρ))) s
   Goal s
-      rewrite rco-correct e₁ ρ
-      with interp e₁ ρ s
+      rewrite rco-correct-exp e₁ ρ
+      with interp-exp e₁ ρ s
   ... | nothing = refl
   ... | just (v₁ , s')
-      rewrite rco-correct e₂ (v₁ ∷ ρ)
+      rewrite rco-correct-exp e₂ (v₁ ∷ ρ)
       = refl
+
+rco-correct : ∀ (e : Exp) (s : StateR ℤ)
+  → interp-LMonVar (rco e) s ≡ interp-LVar e s 
+rco-correct e s rewrite rco-correct-exp e [] = refl
 
 --------------- Proof of correctness for Explicate Control ------------------------
 
 interp-shift-exp : ∀ (e : CExp) (v : ℤ) (ρ₁ : Env) (ρ₂ : Env)
-  → interp-exp (shift-exp e (length ρ₁)) (ρ₁ ++ (v ∷ ρ₂))
-    ≡ interp-exp e (ρ₁ ++ ρ₂)
+  → interp-CExp (shift-exp e (length ρ₁)) (ρ₁ ++ (v ∷ ρ₂))
+    ≡ interp-CExp e (ρ₁ ++ ρ₂)
 interp-shift-exp (Atom atm) v ρ₁ ρ₂ = interp-shift-atm atm v ρ₁ ρ₂
 interp-shift-exp Read v ρ₁ ρ₂ = refl
 interp-shift-exp (Sub a₁ a₂) v ρ₁ ρ₂ = extensionality Goal
   where
   Goal : (s : StateR ℤ) →
-      interp-exp (shift-exp (Sub a₁ a₂) (length ρ₁)) (ρ₁ ++ (v ∷ ρ₂)) s
-    ≡ interp-exp (Sub a₁ a₂) (ρ₁ ++ ρ₂) s
+      interp-CExp (shift-exp (Sub a₁ a₂) (length ρ₁)) (ρ₁ ++ (v ∷ ρ₂)) s
+    ≡ interp-CExp (Sub a₁ a₂) (ρ₁ ++ ρ₂) s
   Goal s
     rewrite interp-shift-atm a₁ v ρ₁ ρ₂ | interp-shift-atm a₂ v ρ₁ ρ₂
       with interp-atm a₁ (ρ₁ ++ ρ₂) s
@@ -194,7 +198,7 @@ interp-shift-tail (Let e c) v ρ₁ ρ₂ = extensionality Goal
      ≡ interp-tail (Let e c) (ρ₁ ++ ρ₂) s
   Goal s
       rewrite interp-shift-exp e v ρ₁ ρ₂
-      with interp-exp e (ρ₁ ++ ρ₂) s
+      with interp-CExp e (ρ₁ ++ ρ₂) s
   ... | nothing = refl
   ... | just (v₁ , s')
       rewrite interp-shift-tail c v (v₁ ∷ ρ₁) ρ₂
@@ -223,12 +227,12 @@ explicate-let-correct (Atom a) c ρ = refl
 explicate-let-correct Read c ρ = refl
 explicate-let-correct (Sub a₁ a₂) m₂ ρ = refl
 
-explicate-correct : ∀ (m : Mon) (ρ : Env)
+explicate-correct-mon : ∀ (m : Mon) (ρ : Env)
    → interp-tail (explicate m) ρ ≡ interp-mon m ρ
-explicate-correct (Atom x) ρ = refl
-explicate-correct Read ρ = refl
-explicate-correct (Sub a₁ a₂) ρ = refl
-explicate-correct (Let m₁ m₂) ρ = extensionality Goal
+explicate-correct-mon (Atom x) ρ = refl
+explicate-correct-mon Read ρ = refl
+explicate-correct-mon (Sub a₁ a₂) ρ = refl
+explicate-correct-mon (Let m₁ m₂) ρ = extensionality Goal
     where
   Goal : (s : StateR ℤ)
     → interp-tail (explicate (Let m₁ m₂)) ρ s ≡ interp-mon (Let m₁ m₂) ρ s
@@ -237,8 +241,12 @@ explicate-correct (Let m₁ m₂) ρ = extensionality Goal
       with interp-mon m₁ ρ s
   ... | nothing = refl
   ... | just (v₁ , s1)
-      rewrite explicate-correct m₂ (v₁ ∷ ρ)
+      rewrite explicate-correct-mon m₂ (v₁ ∷ ρ)
       = refl
+
+explicate-correct : ∀ (m : Mon) (s : StateR ℤ)
+  → interp-CVar (explicate m) s ≡ interp-LMonVar m s
+explicate-correct m s rewrite explicate-correct-mon m [] = refl
 
 --------------- Proof of correctness for Lower Lets ------------------------
 
@@ -270,15 +278,15 @@ interp-shifts-atm a ρ₁ ρ₂ ρ₃ = extensionality (Goal a)
       = refl
 
 interp-shifts-exp : ∀ (e : CExp) (ρ₁ ρ₂ ρ₃ : Env)
-  → interp-exp (shifts-exp e (length ρ₁) (length ρ₂)) (ρ₁ ++ ρ₂ ++ ρ₃)
-  ≡ interp-exp e (ρ₁ ++ ρ₃)
+  → interp-CExp (shifts-exp e (length ρ₁) (length ρ₂)) (ρ₁ ++ ρ₂ ++ ρ₃)
+  ≡ interp-CExp e (ρ₁ ++ ρ₃)
 interp-shifts-exp (Atom a) ρ₁ ρ₂ ρ₃ = interp-shifts-atm a ρ₁ ρ₂ ρ₃
 interp-shifts-exp Read ρ₁ ρ₂ ρ₃ = refl
 interp-shifts-exp (Sub a₁ a₂) ρ₁ ρ₂ ρ₃ = extensionality Goal
   where
   Goal : (s : StateR ℤ)
-    → interp-exp (shifts-exp (Sub a₁ a₂) (length ρ₁) (length ρ₂)) (ρ₁ ++ ρ₂ ++ ρ₃) s
-      ≡ interp-exp (Sub a₁ a₂) (ρ₁ ++ ρ₃) s
+    → interp-CExp (shifts-exp (Sub a₁ a₂) (length ρ₁) (length ρ₂)) (ρ₁ ++ ρ₂ ++ ρ₃) s
+      ≡ interp-CExp (Sub a₁ a₂) (ρ₁ ++ ρ₃) s
   Goal s
        rewrite interp-shifts-atm a₁ ρ₁ ρ₂ ρ₃
        | interp-shifts-atm a₂ ρ₁ ρ₂ ρ₃
@@ -301,7 +309,7 @@ lower-tail-correct (Let e c) ρ₁ ρ₂ eq = extensionality Goal
     ≡ interp-stmt (proj₁ (lower-tail (Let e c))) (ρ₁ ++ ρ₂) s
   Goal s 
       rewrite eq | interp-shifts-exp e [] ρ₁ ρ₂
-      with interp-exp e ρ₂ s
+      with interp-CExp e ρ₂ s
   ... | nothing = refl
   ... | just (v , s1)
       rewrite +-comm 1 (proj₂ (lower-tail c))
@@ -313,11 +321,35 @@ lower-tail-correct (Let e c) ρ₁ ρ₂ eq = extensionality Goal
       | lower-tail-correct c r11 (v ∷ ρ₂) (sym eq2)
       = refl
 
-lower-lets-correct : ∀ (c : CTail) 
-  → interp-tail c [] ≡ interp-prog (lower-lets c)
-lower-lets-correct c
-    with lower-tail-correct c ((replicate (proj₂ (lower-tail c)) 0ℤ)) []
+lower-lets-correct : ∀ (c : CTail) (s : StateR ℤ)
+  → interp-CVar c s ≡ interp-prog (lower-lets c) s
+lower-lets-correct c s = Goal
+  -- TODO: simplify this ugly proof
+  where
+  EQ : interp-tail c [] ≡
+         interp-stmt (lower-tail c .proj₁) (replicate (lower-tail c .proj₂) 0ℤ)
+  EQ
+      with lower-tail-correct c (replicate (lower-tail c .proj₂) 0ℤ) []
               (sym (length-replicate (proj₂ (lower-tail c))))
-... | eq
-     rewrite ++-identityʳ (replicate (proj₂ (lower-tail c)) (ℤ.pos 0))
-    = eq
+  ... | eq
+      rewrite ++-identityʳ (replicate (proj₂ (lower-tail c)) (ℤ.pos 0))
+      = eq
+
+  Goal : interp-CVar c s ≡
+      observe
+      (interp-stmt (lower-tail c .proj₁)
+       (replicate (lower-tail c .proj₂) 0ℤ))
+      s
+  Goal rewrite EQ = refl
+
+--     with lower-tail-correct c ((replicate (proj₂ (lower-tail c)) 0ℤ)) []
+--               (sym (length-replicate (proj₂ (lower-tail c))))
+-- ... | eq
+--      rewrite ++-identityʳ (replicate (proj₂ (lower-tail c)) (ℤ.pos 0))
+--     = {!!}
+
+--------------- Proof of correctness for Select Instructions ------------------------
+
+-- select-inst-correct : ∀ (p : CProg)
+--   → interp-x86-var (select-inst p) ≡ interp-prog p
+-- select-inst-correct p = ?

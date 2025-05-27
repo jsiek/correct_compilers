@@ -38,17 +38,20 @@ data Exp : Set where
 Env : Set
 Env = List ℤ
 
-interp : Exp → Env → Reader ℤ
-interp (Num n) ρ = return n
-interp Read ρ = read
-interp (Sub e₁ e₂) ρ =
-  (interp e₁ ρ) then
-  λ v₁ → (interp e₂ ρ) then
+interp-exp : Exp → Env → Reader ℤ
+interp-exp (Num n) ρ = return n
+interp-exp Read ρ = read
+interp-exp (Sub e₁ e₂) ρ =
+  (interp-exp e₁ ρ) then
+  λ v₁ → (interp-exp e₂ ρ) then
   λ v₂ → return (Data.Integer._-_ v₁ v₂)
-interp (Var i) ρ = try (nth ρ i)
-interp (Let e₁ e₂) ρ =
-  (interp e₁ ρ) then
-  λ v₁ → interp e₂ (v₁ ∷ ρ)
+interp-exp (Var i) ρ = try (nth ρ i)
+interp-exp (Let e₁ e₂) ρ =
+  (interp-exp e₁ ρ) then
+  λ v₁ → interp-exp e₂ (v₁ ∷ ρ)
+
+interp-LVar : Exp → StateR ℤ → Maybe ℤ
+interp-LVar e s = observe (interp-exp e []) s
 
 ----------------- Definition of LMonVar ----------------------------
 
@@ -76,6 +79,9 @@ interp-mon (Sub a₁ a₂) ρ =
 interp-mon (Let e₁ e₂) ρ =
   (interp-mon e₁ ρ) then
   λ v₁ → interp-mon e₂ (v₁ ∷ ρ)
+
+interp-LMonVar : Mon → StateR ℤ → Maybe ℤ
+interp-LMonVar m s = observe (interp-mon m []) s
 
 shift-atm : Atm → ℕ → Atm
 shift-atm (Num x) c = Num x
@@ -112,19 +118,22 @@ data CTail : Set where
   Return : CExp → CTail
   Let : CExp → CTail → CTail
 
-interp-exp : CExp → Env → Reader ℤ
-interp-exp (Atom atm) ρ = interp-atm atm ρ
-interp-exp Read ρ = read
-interp-exp (Sub a₁ a₂) ρ =
+interp-CExp : CExp → Env → Reader ℤ
+interp-CExp (Atom atm) ρ = interp-atm atm ρ
+interp-CExp Read ρ = read
+interp-CExp (Sub a₁ a₂) ρ =
   (interp-atm a₁ ρ) then
   λ v₁ → (interp-atm a₂ ρ) then
   λ v₂ → return (Data.Integer._-_ v₁ v₂)
 
 interp-tail : CTail → Env → Reader ℤ
-interp-tail (Return e) ρ = interp-exp e ρ
+interp-tail (Return e) ρ = interp-CExp e ρ
 interp-tail (Let e t) ρ =
-  (interp-exp e ρ) then
+  (interp-CExp e ρ) then
   λ v₁ → interp-tail t (v₁ ∷ ρ)
+
+interp-CVar : CTail → StateR ℤ → Maybe ℤ
+interp-CVar t s = observe (interp-tail t []) s
 
 shift-exp : CExp → ℕ → CExp
 shift-exp (Atom atm) c = Atom (shift-atm atm c)
@@ -163,13 +172,13 @@ data CProg : Set where
   Program : ℕ → CStmt → CProg
 
 interp-stmt : CStmt → Env → Reader ℤ
-interp-stmt (Return e) ρ = interp-exp e ρ
+interp-stmt (Return e) ρ = interp-CExp e ρ
 interp-stmt (Assign x e s) ρ =
-  (interp-exp e ρ) then
+  (interp-CExp e ρ) then
   (λ v → interp-stmt s (update ρ x v))
 
-interp-prog : CProg → Reader ℤ
-interp-prog (Program n s) = interp-stmt s (replicate n 0ℤ)
+interp-prog : CProg → StateR ℤ → Maybe ℤ
+interp-prog (Program n is) s = observe (interp-stmt is (replicate n 0ℤ)) s
 
 ----------------- Lower Lets (Explicate Part 2) -------------------
 
@@ -257,3 +266,21 @@ interp-x86-var (Program n is) inputs
     with interp-insts is (inputs , [ 0ℤ ] , replicate n 0ℤ)
 ... | nothing = nothing
 ... | just (inputs , regs , ρ) = nth regs 0
+
+----------------- Instruction Selection ----------------------------
+
+to-arg : Atm → Arg
+to-arg (Num x) = Num x
+to-arg (Var x) = Var x
+
+select-exp : CExp → Arg → List Inst
+select-exp (Atom a) dest = [ MovQ (to-arg a) dest ]
+select-exp Read dest = ReadInt ∷ (MovQ (Reg rax) dest) ∷ []
+select-exp (Sub a₁ a₂) dest = MovQ (to-arg a₁) dest ∷ (SubQ (to-arg a₂) dest) ∷ []
+
+select-stmt : CStmt → List Inst
+select-stmt (Return e) = select-exp e (Reg rax)
+select-stmt (Assign x e rest) = (select-exp e (Var x)) ++ select-stmt rest
+
+select-inst : CProg → X86Var
+select-inst (Program n s) = Program n (select-stmt s)

@@ -39,3 +39,8 @@ _⨟_ : ∀{A : Set} → Reader A → Reader A → Reader A
 ... | nothing = nothing
 ... | just (v , s') = M₂ s'
 
+observe : ∀{A : Set} → Reader A → StateR A → Maybe A
+observe r s
+    with r s
+... | nothing = nothing
+... | just (v , s) = just v
