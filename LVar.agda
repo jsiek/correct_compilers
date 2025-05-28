@@ -261,11 +261,14 @@ interp-insts (inst ∷ is) s
 ... | nothing = nothing
 ... | just s' = interp-insts is s'
 
-interp-x86-var : X86Var → (ℕ × (ℕ → ℤ)) → Maybe ℤ
-interp-x86-var (Program n is) inputs
-    with interp-insts is (inputs , [ 0ℤ ] , replicate n 0ℤ)
+run-x86 : (StateX86 → Maybe StateX86) → ℕ → Inputs → Maybe ℤ
+run-x86 prog n inputs
+  with prog (inputs , [ 0ℤ ] , replicate n 0ℤ)
 ... | nothing = nothing
-... | just (inputs , regs , ρ) = nth regs 0
+... | just (inputs' , regs , ρ) = nth regs 0
+
+interp-x86-var : X86Var → Inputs → Maybe ℤ
+interp-x86-var (Program n is) inputs = run-x86 (interp-insts is) n inputs
 
 ----------------- Instruction Selection ----------------------------
 

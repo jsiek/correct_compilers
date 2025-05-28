@@ -337,6 +337,19 @@ lower-lets-correct c s
 
 --------------- Proof of correctness for Select Instructions ------------------------
 
--- select-inst-correct : ∀ (p : CProg)
---   → interp-x86-var (select-inst p) ≡ interp-prog p
--- select-inst-correct p = ?
+
+-- interp-insts (select-stmt s) n (inputs , regs , vars)
+-- : Maybe StateX86
+
+-- interp-stmt s vars inputs
+-- : Maybe (ℤ × Inputs)
+
+
+select-inst-correct : ∀ (p : CProg)
+  → interp-x86-var (select-inst p) ≡ interp-prog p
+select-inst-correct (Program n s) = extensionality {!!}
+  where
+  Goal : (inputs : Inputs)
+    → run-x86 (interp-insts (select-stmt s)) n inputs
+    ≡ run (interp-stmt s (replicate n 0ℤ)) inputs
+  Goal inputs = {!!}
