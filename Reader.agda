@@ -19,7 +19,7 @@ Inputs = ℕ × (ℕ → ℤ)
 Reader : Set → Set
 Reader A = Inputs → Maybe (A × Inputs)
 
-_then_ : ∀{A : Set} → Reader A → (A → Reader A) → Reader A
+_then_ : ∀{A B : Set} → Reader A → (A → Reader B) → Reader B
 (M then g) s
     with M s
 ... | nothing = nothing
