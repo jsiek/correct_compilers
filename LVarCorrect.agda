@@ -298,11 +298,11 @@ interp-shifts-exp (Sub a₁ a₂) ρ₁ ρ₂ ρ₃ = extensionality Goal
   ... | just (v₂ , s3)
        = refl
 
-lower-tail-correct : ∀ (c : CTail) (ρ₁ ρ₂ : Env)
+lower-tail-correct-aux : ∀ (c : CTail) (ρ₁ ρ₂ : Env)
   → proj₂ (lower-tail c) ≡ length ρ₁
   → interp-tail c ρ₂ ≡ interp-stmt (proj₁ (lower-tail c)) (ρ₁ ++ ρ₂)
-lower-tail-correct (Return e) [] ρ₂ eq = refl
-lower-tail-correct (Let e c) ρ₁ ρ₂ eq = extensionality Goal
+lower-tail-correct-aux (Return e) [] ρ₂ eq = refl
+lower-tail-correct-aux (Let e c) ρ₁ ρ₂ eq = extensionality Goal
   where
   Goal : (s : StateR ℤ)
     → (interp-tail (Let e c) ρ₂) s
@@ -318,35 +318,22 @@ lower-tail-correct (Let e c) ρ₁ ρ₂ eq = extensionality Goal
       rewrite ++-assoc r11 (v₂ ∷ []) ρ₂
       | sym eq2
       | update-correct r11 ρ₂ v₂ v
-      | lower-tail-correct c r11 (v ∷ ρ₂) (sym eq2)
+      | lower-tail-correct-aux c r11 (v ∷ ρ₂) (sym eq2)
       = refl
+
+lower-tail-correct : ∀ (c : CTail) (ρ : Env)
+  → proj₂ (lower-tail c) ≡ length ρ
+  → interp-tail c [] ≡ interp-stmt (proj₁ (lower-tail c)) ρ
+lower-tail-correct c ρ prem
+    with lower-tail-correct-aux c ρ [] prem
+... | eq rewrite ++-identityʳ ρ = eq
 
 lower-lets-correct : ∀ (c : CTail) (s : StateR ℤ)
   → interp-CVar c s ≡ interp-prog (lower-lets c) s
-lower-lets-correct c s = Goal
-  -- TODO: simplify this ugly proof
-  where
-  EQ : interp-tail c [] ≡
-         interp-stmt (lower-tail c .proj₁) (replicate (lower-tail c .proj₂) 0ℤ)
-  EQ
-      with lower-tail-correct c (replicate (lower-tail c .proj₂) 0ℤ) []
+lower-lets-correct c s 
+  rewrite lower-tail-correct c (replicate (lower-tail c .proj₂) 0ℤ)
               (sym (length-replicate (proj₂ (lower-tail c))))
-  ... | eq
-      rewrite ++-identityʳ (replicate (proj₂ (lower-tail c)) (ℤ.pos 0))
-      = eq
-
-  Goal : interp-CVar c s ≡
-      run
-      (interp-stmt (lower-tail c .proj₁)
-       (replicate (lower-tail c .proj₂) 0ℤ))
-      s
-  Goal rewrite EQ = refl
-
---     with lower-tail-correct c ((replicate (proj₂ (lower-tail c)) 0ℤ)) []
---               (sym (length-replicate (proj₂ (lower-tail c))))
--- ... | eq
---      rewrite ++-identityʳ (replicate (proj₂ (lower-tail c)) (ℤ.pos 0))
---     = {!!}
+  = refl
 
 --------------- Proof of correctness for Select Instructions ------------------------
 
