@@ -1,6 +1,7 @@
 module Reader where
 
 open import Data.Nat using (ℕ; zero; suc; _≤ᵇ_)
+open import Data.Integer using (ℤ)
 open import Data.Product
 open import Data.Sum
 open import Data.Maybe
@@ -11,11 +12,12 @@ open import Relation.Binary.PropositionalEquality
 
 ----------------- Reader (ish) Monad ----------------------------
 
-StateR : Set → Set
-StateR A = ℕ × (ℕ → A)
+-- stream of integers
+Inputs : Set
+Inputs = ℕ × (ℕ → ℤ)
 
 Reader : Set → Set
-Reader A = StateR A → Maybe (A × StateR A)
+Reader A = Inputs → Maybe (A × Inputs)
 
 _then_ : ∀{A : Set} → Reader A → (A → Reader A) → Reader A
 (M then g) s
@@ -23,8 +25,8 @@ _then_ : ∀{A : Set} → Reader A → (A → Reader A) → Reader A
 ... | nothing = nothing
 ... | just (v , s') = g v s'
 
-read : ∀{A} → Reader A
-read (i , f) = just (f i , suc i , f)
+read : Reader ℤ
+read (i , f) = just (f i , (suc i , f))
 
 return : ∀{A : Set} → A → Reader A
 return a s = just (a , s)
@@ -39,7 +41,7 @@ _⨟_ : ∀{A : Set} → Reader A → Reader A → Reader A
 ... | nothing = nothing
 ... | just (v , s') = M₂ s'
 
-run : ∀{A : Set} → Reader A → StateR A → Maybe A
+run : ∀{A : Set} → Reader A → Inputs → Maybe A
 run r s
     with r s
 ... | nothing = nothing

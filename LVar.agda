@@ -50,7 +50,7 @@ interp-exp (Let e₁ e₂) ρ =
   (interp-exp e₁ ρ) then
   λ v₁ → interp-exp e₂ (v₁ ∷ ρ)
 
-interp-LVar : Exp → StateR ℤ → Maybe ℤ
+interp-LVar : Exp → Inputs → Maybe ℤ
 interp-LVar e s = run (interp-exp e []) s
 
 ----------------- Definition of LMonVar ----------------------------
@@ -80,7 +80,7 @@ interp-mon (Let e₁ e₂) ρ =
   (interp-mon e₁ ρ) then
   λ v₁ → interp-mon e₂ (v₁ ∷ ρ)
 
-interp-LMonVar : Mon → StateR ℤ → Maybe ℤ
+interp-LMonVar : Mon → Inputs → Maybe ℤ
 interp-LMonVar m s = run (interp-mon m []) s
 
 shift-atm : Atm → ℕ → Atm
@@ -132,7 +132,7 @@ interp-tail (Let e t) ρ =
   (interp-CExp e ρ) then
   λ v₁ → interp-tail t (v₁ ∷ ρ)
 
-interp-CVar : CTail → StateR ℤ → Maybe ℤ
+interp-CVar : CTail → Inputs → Maybe ℤ
 interp-CVar t s = run (interp-tail t []) s
 
 shift-exp : CExp → ℕ → CExp
@@ -177,7 +177,7 @@ interp-stmt (Assign x e s) ρ =
   (interp-CExp e ρ) then
   (λ v → interp-stmt s (update ρ x v))
 
-interp-prog : CProg → StateR ℤ → Maybe ℤ
+interp-prog : CProg → Inputs → Maybe ℤ
 interp-prog (Program n is) s = run (interp-stmt is (replicate n 0ℤ)) s
 
 ----------------- Lower Lets (Explicate Part 2) -------------------
@@ -224,7 +224,7 @@ data X86Var : Set where
   Program : ℕ → List Inst → X86Var
 
 StateX86 : Set
-StateX86 = StateR ℤ × List ℤ × List ℤ -- input + registers + variables
+StateX86 = Inputs × List ℤ × List ℤ -- input + registers + variables
 
 interp-arg : Arg → StateX86 → Maybe ℤ
 interp-arg (Num i) s = just i
