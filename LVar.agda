@@ -1,6 +1,7 @@
 module LVar where
 
-open import Data.Nat using (ℕ; zero; suc; _≤ᵇ_)
+open import Agda.Builtin.Unit
+open import Data.Nat using (ℕ; zero; suc; _≤ᵇ_; _<_)
 open import Data.Nat.Properties
 open import Data.Product
 open import Data.Integer using (ℤ; -_; _-_; 0ℤ)
@@ -65,16 +66,16 @@ data Mon : Set where
   Sub : Atm → Atm → Mon
   Let : Mon → Mon → Mon
 
-interp-atm : Atm → Env → Reader ℤ
-interp-atm (Num n) ρ = return n
-interp-atm (Var i) ρ = try (nth ρ i)
+interp-atm : Atm → Env → Maybe ℤ
+interp-atm (Num n) ρ = just n
+interp-atm (Var i) ρ = nth ρ i
 
 interp-mon : Mon → Env → Reader ℤ
-interp-mon (Atom atm) ρ = interp-atm atm ρ
+interp-mon (Atom atm) ρ = try (interp-atm atm ρ)
 interp-mon Read ρ = read
 interp-mon (Sub a₁ a₂) ρ =
-  (interp-atm a₁ ρ) then
-  λ v₁ → (interp-atm a₂ ρ) then
+  (try (interp-atm a₁ ρ)) then
+  λ v₁ → try (interp-atm a₂ ρ) then
   λ v₂ → return (Data.Integer._-_ v₁ v₂)
 interp-mon (Let e₁ e₂) ρ =
   (interp-mon e₁ ρ) then
@@ -119,11 +120,11 @@ data CTail : Set where
   Let : CExp → CTail → CTail
 
 interp-CExp : CExp → Env → Reader ℤ
-interp-CExp (Atom atm) ρ = interp-atm atm ρ
+interp-CExp (Atom atm) ρ = try (interp-atm atm ρ)
 interp-CExp Read ρ = read
 interp-CExp (Sub a₁ a₂) ρ =
-  (interp-atm a₁ ρ) then
-  λ v₁ → (interp-atm a₂ ρ) then
+  (try (interp-atm a₁ ρ)) then
+  λ v₁ → try (interp-atm a₂ ρ) then
   λ v₂ → return (Data.Integer._-_ v₁ v₂)
 
 interp-tail : CTail → Env → Reader ℤ
@@ -166,7 +167,7 @@ explicate (Let m₁ m₂) = explicate-let m₁ (explicate m₂)
 
 data CStmt : Set where
   Return : CExp → CStmt
-  Assign : ℕ → CExp → CStmt → CStmt
+  Assign : Id → CExp → CStmt → CStmt
 
 data CProg : Set where
   Program : ℕ → CStmt → CProg
@@ -212,12 +213,16 @@ data Arg : Set where
   Var : Id → Arg
   Reg : ℕ → Arg
 
+data Dest : Set where
+  Var : Id → Dest
+  Reg : ℕ → Dest
+
 rax : ℕ
 rax = 0
 
 data Inst : Set where
-  MovQ : Arg → Arg → Inst
-  SubQ : Arg → Arg → Inst
+  MovQ : Arg → Dest → Inst
+  SubQ : Arg → Dest → Inst
   ReadInt : Inst
 
 data X86Var : Set where
@@ -231,23 +236,26 @@ interp-arg (Num i) s = just i
 interp-arg (Var x) (inputs , regs , ρ) = nth ρ x
 interp-arg (Reg x) (inputs , regs , ρ) = nth regs x
 
-write-arg : Arg → ℤ → StateX86 → Maybe StateX86
-write-arg (Num x) v (inputs , regs , ρ) = nothing
-write-arg (Var x) v (inputs , regs , ρ) = just (inputs , regs , update ρ x v)
-write-arg (Reg x) v (inputs , regs , ρ) = just (inputs , update regs x v , ρ)
+interp-dest : Dest → StateX86 → Maybe ℤ
+interp-dest (Var x) (inputs , regs , ρ) = nth ρ x
+interp-dest (Reg x) (inputs , regs , ρ) = nth regs x
+
+write : Dest → ℤ → StateX86 → StateX86
+write (Var x) v (inputs , regs , ρ) = (inputs , regs , update ρ x v)
+write (Reg x) v (inputs , regs , ρ) = (inputs , update regs x v , ρ)
 
 interp-inst : Inst → StateX86 → Maybe StateX86
 interp-inst (MovQ src dest) s
     with interp-arg src s
 ... | nothing = nothing
-... | just val = write-arg dest val s
+... | just val = just (write dest val s)
 interp-inst (SubQ src dest) s
     with interp-arg src s
 ... | nothing = nothing
 ... | just y
-    with interp-arg dest s
+    with interp-dest dest s
 ... | nothing = nothing
-... | just x = write-arg dest (x - y) s
+... | just x = just (write dest (x - y) s)
 interp-inst ReadInt (inputs , regs , ρ)
     with read inputs
 ... | nothing = nothing  
@@ -276,14 +284,18 @@ to-arg : Atm → Arg
 to-arg (Num x) = Num x
 to-arg (Var x) = Var x
 
-select-exp : CExp → Arg → List Inst
+select-exp : CExp → Dest → List Inst
 select-exp (Atom a) dest = [ MovQ (to-arg a) dest ]
 select-exp Read dest = ReadInt ∷ (MovQ (Reg rax) dest) ∷ []
-select-exp (Sub a₁ a₂) dest = MovQ (to-arg a₁) dest ∷ (SubQ (to-arg a₂) dest) ∷ []
+select-exp (Sub a₁ a₂) dest =
+  -- was:
+  -- MovQ (to-arg a₁) dest ∷ (SubQ (to-arg a₂) dest) ∷ []
+  -- but if dest = a₂, there's a problem.
+  MovQ (to-arg a₁) (Reg rax) ∷ (SubQ (to-arg a₂) (Reg rax)) ∷ MovQ (Reg rax) dest ∷ []
 
 select-stmt : CStmt → List Inst
 select-stmt (Return e) = select-exp e (Reg rax)
-select-stmt (Assign x e rest) = (select-exp e (Var x)) ++ select-stmt rest
+select-stmt (Assign x e rest) = (select-exp e (Var x)) ++ (select-stmt rest)
 
 select-inst : CProg → X86Var
 select-inst (Program n s) = Program n (select-stmt s)
