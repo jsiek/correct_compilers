@@ -28,6 +28,9 @@ _then_ : ∀{A B : Set} → Reader A → (A → Reader B) → Reader B
 read : Reader ℤ
 read (i , f) = just (f i , (suc i , f))
 
+read-int : ∀{A : Set} → (ℤ → A) → Reader A
+read-int inj (i , f) = just (inj (f i) , (suc i , f))
+
 return : ∀{A : Set} → A → Reader A
 return a s = just (a , s)
 

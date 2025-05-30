@@ -11,21 +11,7 @@ open import Relation.Binary.PropositionalEquality
    using (_≡_; refl; trans; sym; cong; cong-app)
 open import Agda.Builtin.Bool
 open import Reader
-
-nth : ∀{A : Set} → List A → ℕ → Maybe A
-nth [] i = nothing
-nth (x ∷ xs) zero    = just x
-nth (x ∷ xs) (suc i) = nth xs i
-
-update : ∀{A : Set} → List A → ℕ → A → List A
-update [] i v = []
-update (x ∷ xs) zero v = v ∷ xs
-update (x ∷ xs) (suc i) v = x ∷ update xs i v
-
------------------ Variables ----------------------------
-
-Id : Set
-Id = ℕ
+open import Utilities
 
 ----------------- Definition of LVar ----------------------------
 
@@ -36,16 +22,13 @@ data Exp : Set where
   Var : (i : Id) → Exp
   Let : Exp → Exp → Exp
 
-Env : Set
-Env = List ℤ
-
-interp-exp : Exp → Env → Reader ℤ
+interp-exp : Exp → Env ℤ → Reader ℤ
 interp-exp (Num n) ρ = return n
 interp-exp Read ρ = read
 interp-exp (Sub e₁ e₂) ρ =
   (interp-exp e₁ ρ) then
   λ v₁ → (interp-exp e₂ ρ) then
-  λ v₂ → return (Data.Integer._-_ v₁ v₂)
+  λ v₂ → return (v₁ - v₂)
 interp-exp (Var i) ρ = try (nth ρ i)
 interp-exp (Let e₁ e₂) ρ =
   (interp-exp e₁ ρ) then
@@ -66,11 +49,11 @@ data Mon : Set where
   Sub : Atm → Atm → Mon
   Let : Mon → Mon → Mon
 
-interp-atm : Atm → Env → Maybe ℤ
+interp-atm : Atm → Env ℤ → Maybe ℤ
 interp-atm (Num n) ρ = just n
 interp-atm (Var i) ρ = nth ρ i
 
-interp-mon : Mon → Env → Reader ℤ
+interp-mon : Mon → Env ℤ → Reader ℤ
 interp-mon (Atom atm) ρ = try (interp-atm atm ρ)
 interp-mon Read ρ = read
 interp-mon (Sub a₁ a₂) ρ =
@@ -86,10 +69,7 @@ interp-LMonVar m s = run (interp-mon m []) s
 
 shift-atm : Atm → ℕ → Atm
 shift-atm (Num x) c = Num x
-shift-atm (Var x) c
-    with c ≤ᵇ x
-... | true = Var (suc x)
-... | false = Var x
+shift-atm (Var x) c = Var (shift-var x c)
 
 shift-mon : Mon → ℕ → Mon
 shift-mon (Atom atm) c = Atom (shift-atm atm c)
@@ -119,7 +99,7 @@ data CTail : Set where
   Return : CExp → CTail
   Let : CExp → CTail → CTail
 
-interp-CExp : CExp → Env → Reader ℤ
+interp-CExp : CExp → Env ℤ → Reader ℤ
 interp-CExp (Atom atm) ρ = try (interp-atm atm ρ)
 interp-CExp Read ρ = read
 interp-CExp (Sub a₁ a₂) ρ =
@@ -127,7 +107,7 @@ interp-CExp (Sub a₁ a₂) ρ =
   λ v₁ → try (interp-atm a₂ ρ) then
   λ v₂ → return (Data.Integer._-_ v₁ v₂)
 
-interp-tail : CTail → Env → Reader ℤ
+interp-tail : CTail → Env ℤ → Reader ℤ
 interp-tail (Return e) ρ = interp-CExp e ρ
 interp-tail (Let e t) ρ =
   (interp-CExp e ρ) then
@@ -172,7 +152,7 @@ data CStmt : Set where
 data CProg : Set where
   Program : ℕ → CStmt → CProg
 
-interp-stmt : CStmt → Env → Reader ℤ
+interp-stmt : CStmt → Env ℤ → Reader ℤ
 interp-stmt (Return e) ρ = interp-CExp e ρ
 interp-stmt (Assign x e s) ρ =
   (interp-CExp e ρ) then

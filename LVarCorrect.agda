@@ -17,101 +17,20 @@ open import Agda.Builtin.Bool
 open import Relation.Nullary.Negation.Core using (¬_; contradiction)
 open import Function.Base using (case_of_; case_returning_of_)
 
-open import LVar
 open import Reader
+open import Utilities
+open import LVar
 
-update-correct : ∀ {A} (xs ys : List A) (v v' : A)
-  → update (xs ++ v ∷ ys) (length xs) v' ≡ xs ++ v' ∷ ys
-update-correct [] ys v v' = refl
-update-correct (x ∷ xs) ys v v' rewrite update-correct xs ys v v' = refl
-
-++-length : ∀ {A : Set} (xs : List A) (m n : ℕ)
-  → length xs ≡ (m + n)
-  → Σ[ ys ∈ List A ] Σ[ zs ∈ List A ] (xs ≡ ys ++ zs × length ys ≡ m × length zs ≡ n)
-++-length xs zero n len_mn = [] , xs , refl , refl , len_mn
-++-length (x ∷ xs) (suc m) n len_mn
-    with ++-length xs m n (suc-injective len_mn)
-... | ys , zs , refl , refl , refl
-    = x ∷ ys , zs , refl , refl , refl
-
-++-length-+-1 : ∀ {A : Set} (xs : List A) (m : ℕ)
-  → length xs ≡ (m + 1)
-  → Σ[ ys ∈ List A ] Σ[ z ∈ A ] (xs ≡ ys ++ [ z ] × length ys ≡ m)
-++-length-+-1 xs m eq
-    with ++-length xs m 1 eq
-... | ys , z ∷ [] , refl , refl , eq2
-    = ys , z , refl , refl
-
-m≤n⇒-+ : ∀ (m n : ℕ)
-  → m ≤ n
-  → Σ[ l ∈ ℕ ] m + l ≡ n
-m≤n⇒-+ zero n mn = n , refl
-m≤n⇒-+ (suc m) (suc n) (s≤s mn)
-    with m≤n⇒-+ m n mn
-... | l , refl = l , refl
-
-nth-++-< : ∀{A : Set} → (xs ys : List A) (x : ℕ)
-       → x < length xs
-       → nth (xs ++ ys) x ≡ nth xs x
-nth-++-< {A} (x₁ ∷ xs) ys zero lt = refl
-nth-++-< {A} (x₁ ∷ xs) ys (suc x) (_≤_.s≤s lt) = nth-++-< xs ys x lt
-
--- TODO: replace uses of nth-++-≤ with nth-++-+
-nth-++-≤ : ∀{A : Set} → (xs ys : List A) (x : ℕ)
-       → length xs ≤ x
-       → nth (xs ++ ys) x ≡ nth ys (x ∸ length xs)
-nth-++-≤ {A} [] ys x lt = refl
-nth-++-≤ {A} (x₁ ∷ xs) ys (suc x) (_≤_.s≤s lt) = nth-++-≤ xs ys x lt
-
-nth-++-+ : ∀{A : Set} → (xs ys : List A) (n : ℕ)
-       → nth (xs ++ ys) (length xs + n) ≡ nth ys n
-nth-++-+ {A} [] ys n = refl
-nth-++-+ {A} (x ∷ xs) ys n = nth-++-+ xs ys n
-
-
-nth-update : ∀ (ρ : Env) (x : Id) (v : ℤ)
-  → x < length ρ
-  → nth (update ρ x v) x ≡ just v
-nth-update (v' ∷ ρ) zero v lt = refl
-nth-update (v' ∷ ρ) (suc x) v (s≤s lt) = nth-update ρ x v lt
-
-update-length : ∀ (ρ : Env) (x : Id) (v : ℤ)
-  → length (update ρ x v) ≡ length ρ
-update-length [] x v = refl
-update-length (z ∷ ρ) zero v = refl
-update-length (z ∷ ρ) (suc x) v rewrite update-length ρ x v = refl
-
-eq-true-top : ∀{P} → P ≡ true → Data.Bool.T P
-eq-true-top {P} eq rewrite eq = tt
-
-eq-false-not-top : ∀{P} → P ≡ false → ¬ Data.Bool.T P
-eq-false-not-top {P} eq rewrite eq = λ {()}
-
-postulate
-  extensionality : ∀ {A B : Set} {f g : A → B}
-    → (∀ (x : A) → f x ≡ g x)
-      -----------------------------------
-    → f ≡ g
 
 --------------- Proof of correctness for RCO ------------------------
 
-interp-shift-atm : ∀ (a : Atm) (v : ℤ) (ρ₁ : Env) (ρ₂ : Env)
+interp-shift-atm : ∀ (a : Atm) (v : ℤ) (ρ₁ ρ₂ : Env ℤ)
   → interp-atm (shift-atm a (length ρ₁)) (ρ₁ ++ v ∷ ρ₂) 
     ≡ interp-atm a (ρ₁ ++ ρ₂) 
 interp-shift-atm (Num n) v ρ₁ ρ₂ = refl
-interp-shift-atm (Var x) v ρ₁ ρ₂
-    with (length ρ₁) ≤ᵇ x in lt
-... | true
-    rewrite nth-++-≤ ρ₁ ρ₂ x (≤ᵇ⇒≤ (length ρ₁) x (eq-true-top lt))
-    | nth-++-≤ ρ₁ (v ∷ ρ₂) (suc x) (≤-trans ((≤ᵇ⇒≤ (length ρ₁) x (eq-true-top lt))) (n≤1+n x))
-    | +-∸-assoc 1 {x}{length ρ₁} (≤ᵇ⇒≤ (length ρ₁) x (eq-true-top lt)) =
-      refl
-... | false
-    rewrite nth-++-< ρ₁ ρ₂ x (≰⇒> λ x₁ → (eq-false-not-top lt) (≤⇒≤ᵇ x₁))
-    | nth-++-< ρ₁ (v ∷ ρ₂) x ((≰⇒> λ x₁ → (eq-false-not-top lt) (≤⇒≤ᵇ x₁))) =
-   refl  
+interp-shift-atm (Var x) v ρ₁ ρ₂ = nth-++-shift-var ρ₁ ρ₂ v x
 
-interp-shift-mon : ∀ (m : Mon) (v : ℤ) (ρ₁ : Env) (ρ₂ : Env)
+interp-shift-mon : ∀ (m : Mon) (v : ℤ) (ρ₁ ρ₂ : Env ℤ)
   → interp-mon (shift-mon m (length ρ₁)) (ρ₁ ++ (v ∷ ρ₂))
     ≡ interp-mon m (ρ₁ ++ ρ₂)
 interp-shift-mon (Atom a) v ρ₁ ρ₂ rewrite interp-shift-atm a v ρ₁ ρ₂ = refl
@@ -121,34 +40,27 @@ interp-shift-mon (Sub a₁ a₂) v ρ₁ ρ₂
     | interp-shift-atm a₂ v ρ₁ ρ₂
     = refl
 interp-shift-mon (Let m₁ m₂) v ρ₁ ρ₂ 
-  rewrite interp-shift-mon m₁ v ρ₁ ρ₂
   = extensionality Goal
   where
   Goal : (s : Inputs) →
-          (interp-mon m₁ (ρ₁ ++ ρ₂) then
-            (λ v₁ → interp-mon (shift-mon m₂ (suc (length ρ₁))) (v₁ ∷ ρ₁ ++ v ∷ ρ₂))) s
-          ≡ (interp-mon m₁ (ρ₁ ++ ρ₂) then
-             (λ v₁ → interp-mon m₂ (v₁ ∷ ρ₁ ++ ρ₂))) s
+     interp-mon (shift-mon (Let m₁ m₂) (length ρ₁)) (ρ₁ ++ (v ∷ ρ₂)) s
+     ≡ interp-mon (Let m₁ m₂) (ρ₁ ++ ρ₂) s
   Goal s
+      rewrite interp-shift-mon m₁ v ρ₁ ρ₂
       with interp-mon m₁ (ρ₁ ++ ρ₂) s
   ... | nothing = refl
   ... | just (v₁ , s')
       rewrite interp-shift-mon m₂ v (v₁ ∷ ρ₁) ρ₂
       = refl
 
-rco-correct-exp : ∀ (e : Exp) (ρ : Env)
+rco-correct-exp : ∀ (e : Exp) (ρ : Env ℤ)
   → interp-mon (rco e) ρ ≡ interp-exp e ρ
 rco-correct-exp (Num x) ρ = refl
 rco-correct-exp Read ρ = refl
 rco-correct-exp (Sub e₁ e₂) ρ = extensionality Goal
   where
   Goal : (s : Inputs) →
-      (interp-mon (rco e₁) ρ then
-       (λ v₁ → interp-mon (shift-mon (rco e₂) 0) (v₁ ∷ ρ) then
-       (λ v₂ → return (v₁ - v₂)))) s
-      ≡ (interp-exp e₁ ρ then
-        (λ v₁ → interp-exp e₂ ρ then
-        (λ v₂ → return (v₁ - v₂)))) s
+         interp-mon (rco (Sub e₁ e₂)) ρ s ≡ interp-exp (Sub e₁ e₂) ρ s
   Goal s
       rewrite rco-correct-exp e₁ ρ
       with interp-exp e₁ ρ s
@@ -161,8 +73,7 @@ rco-correct-exp (Var i₁) ρ = refl
 rco-correct-exp (Let e₁ e₂) ρ = extensionality Goal
   where
   Goal : (s : Inputs) →
-        (interp-mon (rco e₁) ρ then (λ v₁ → interp-mon (rco e₂) (v₁ ∷ ρ))) s
-      ≡ (interp-exp e₁ ρ then (λ v₁ → interp-exp e₂ (v₁ ∷ ρ))) s
+         interp-mon (rco (Let e₁ e₂)) ρ s ≡ interp-exp (Let e₁ e₂) ρ s  
   Goal s
       rewrite rco-correct-exp e₁ ρ
       with interp-exp e₁ ρ s
@@ -175,9 +86,9 @@ rco-correct : ∀ (e : Exp) (s : Inputs)
   → interp-LMonVar (rco e) s ≡ interp-LVar e s 
 rco-correct e s rewrite rco-correct-exp e [] = refl
 
---------------- Proof of correctness for Explicate Control ------------------------
+--------------- Proof of correctness for Explicate Control -------------------
 
-interp-shift-exp : ∀ (e : CExp) (v : ℤ) (ρ₁ : Env) (ρ₂ : Env)
+interp-shift-exp : ∀ (e : CExp) (v : ℤ) (ρ₁ ρ₂ : Env ℤ)
   → interp-CExp (shift-exp e (length ρ₁)) (ρ₁ ++ (v ∷ ρ₂))
     ≡ interp-CExp e (ρ₁ ++ ρ₂)
 interp-shift-exp (Atom atm) v ρ₁ ρ₂ rewrite interp-shift-atm atm v ρ₁ ρ₂ = refl
@@ -191,7 +102,7 @@ interp-shift-exp (Sub a₁ a₂) v ρ₁ ρ₂
 ... | nothing = refl
 ... | just v₂ = refl
 
-interp-shift-tail : ∀ (c : CTail) (v : ℤ) (ρ₁ : Env) (ρ₂ : Env)
+interp-shift-tail : ∀ (c : CTail) (v : ℤ) (ρ₁ ρ₂ : Env ℤ)
   → interp-tail (shift-tail c (length ρ₁)) (ρ₁ ++ (v ∷ ρ₂))
     ≡ interp-tail c (ρ₁ ++ ρ₂)
 interp-shift-tail (Return e) v ρ₁ ρ₂ = interp-shift-exp e v ρ₁ ρ₂
@@ -208,7 +119,7 @@ interp-shift-tail (Let e c) v ρ₁ ρ₂ = extensionality Goal
       rewrite interp-shift-tail c v (v₁ ∷ ρ₁) ρ₂
       = refl
       
-explicate-let-correct : ∀ (m : Mon) (c : CTail) (ρ : Env)
+explicate-let-correct : ∀ (m : Mon) (c : CTail) (ρ : Env ℤ)
    → interp-tail (explicate-let m c) ρ
      ≡ (interp-mon m ρ then (λ v₁ → interp-tail c (v₁ ∷ ρ)))
 explicate-let-correct (Let m₁ m₂) c ρ = extensionality Goal
@@ -231,7 +142,7 @@ explicate-let-correct (Atom a) c ρ = refl
 explicate-let-correct Read c ρ = refl
 explicate-let-correct (Sub a₁ a₂) m₂ ρ = refl
 
-explicate-correct-mon : ∀ (m : Mon) (ρ : Env)
+explicate-correct-mon : ∀ (m : Mon) (ρ : Env ℤ)
    → interp-tail (explicate m) ρ ≡ interp-mon m ρ
 explicate-correct-mon (Atom x) ρ = refl
 explicate-correct-mon Read ρ = refl
@@ -254,7 +165,7 @@ explicate-correct m s rewrite explicate-correct-mon m [] = refl
 
 --------------- Proof of correctness for Lower Lets ------------------------
 
-interp-shifts-atm : ∀ (a : Atm) (ρ₁ ρ₂ ρ₃ : Env)
+interp-shifts-atm : ∀ (a : Atm) (ρ₁ ρ₂ ρ₃ : Env ℤ)
   → interp-atm (shifts-atm a (length ρ₁) (length ρ₂)) (ρ₁ ++ ρ₂ ++ ρ₃)
   ≡ interp-atm a (ρ₁ ++ ρ₃)
 interp-shifts-atm (Num x) ρ₁ ρ₂ ρ₃ = refl
@@ -276,7 +187,7 @@ interp-shifts-atm (Var x) ρ₁ ρ₂ ρ₃ | false
     | nth-++-< ρ₁ ρ₃ x (≰⇒> λ x₁ → (eq-false-not-top lt) (≤⇒≤ᵇ x₁))
     = refl
 
-interp-shifts-exp : ∀ (e : CExp) (ρ₁ ρ₂ ρ₃ : Env)
+interp-shifts-exp : ∀ (e : CExp) (ρ₁ ρ₂ ρ₃ : Env ℤ)
   → interp-CExp (shifts-exp e (length ρ₁) (length ρ₂)) (ρ₁ ++ ρ₂ ++ ρ₃)
   ≡ interp-CExp e (ρ₁ ++ ρ₃)
 interp-shifts-exp (Atom a) ρ₁ ρ₂ ρ₃ rewrite interp-shifts-atm a ρ₁ ρ₂ ρ₃ = refl
@@ -297,7 +208,7 @@ interp-shifts-exp (Sub a₁ a₂) ρ₁ ρ₂ ρ₃ = extensionality Goal
   ... | just v₂
        = refl
 
-lower-tail-correct-aux : ∀ (c : CTail) (ρ₁ ρ₂ : Env)
+lower-tail-correct-aux : ∀ (c : CTail) (ρ₁ ρ₂ : Env ℤ)
   → proj₂ (lower-tail c) ≡ length ρ₁
   → interp-tail c ρ₂ ≡ interp-stmt (proj₁ (lower-tail c)) (ρ₁ ++ ρ₂)
 lower-tail-correct-aux (Return e) [] ρ₂ eq = refl
@@ -320,7 +231,7 @@ lower-tail-correct-aux (Let e c) ρ₁ ρ₂ eq = extensionality Goal
       | lower-tail-correct-aux c r11 (v ∷ ρ₂) (sym eq2)
       = refl
 
-lower-tail-correct : ∀ (c : CTail) (ρ : Env)
+lower-tail-correct : ∀ (c : CTail) (ρ : Env ℤ)
   → proj₂ (lower-tail c) ≡ length ρ
   → interp-tail c [] ≡ interp-stmt (proj₁ (lower-tail c)) ρ
 lower-tail-correct c ρ prem
@@ -415,7 +326,7 @@ OutSync (just x) nothing = ⊥
 OutSync nothing (just x) = ⊥
 OutSync nothing nothing = ⊤
 
-to-arg-correct : ∀ (a : Atm) (ρ : Env) (inputs : Inputs) (regs : List ℤ) 
+to-arg-correct : ∀ (a : Atm) (ρ : Env ℤ) (inputs : Inputs) (regs : List ℤ) 
   → (interp-atm a ρ) ≡ (interp-arg (to-arg a) (inputs , regs , ρ))
 to-arg-correct (Num n) ρ inputs regs = refl
 to-arg-correct (Var x) ρ inputs regs
@@ -423,7 +334,8 @@ to-arg-correct (Var x) ρ inputs regs
 ... | nothing = refl
 ... | just v = refl
 
-seq : (StateX86 → Maybe StateX86) → (StateX86 → Maybe StateX86) → StateX86 → Maybe StateX86
+seq : (StateX86 → Maybe StateX86) → (StateX86 → Maybe StateX86)
+    → StateX86 → Maybe StateX86
 seq M₁ M₂ s1
     with M₁ s1
 ... | nothing = nothing
@@ -493,7 +405,7 @@ write-var-update (Sub a₁ a₂) x inputs inputs' regs regs' ρ ρ' v rax-lt x-l
 ... | refl = refl
 
 
-select-exp-correct : ∀ (e : CExp) (ρ : Env) (inputs : Inputs) (dest : Dest) (regs : List ℤ)
+select-exp-correct : ∀ (e : CExp) (ρ : Env ℤ) (inputs : Inputs) (dest : Dest) (regs : List ℤ)
   → DestOK dest (length ρ) (length regs)
   → DestOK (Reg rax) (length ρ) (length regs)
   → OutSyncExp (interp-CExp e ρ inputs) (interp-insts (select-exp e dest) (inputs , regs , ρ)) dest
@@ -584,7 +496,7 @@ interp-insts-evolved (i ∷ is) s s' eq2
     let IH = interp-insts-evolved is s2 s' eq2 in
     Evolved-trans s s2 s' E1 IH
 
-select-stmt-correct : ∀ (s : CStmt) (ρ : Env) (inputs : Inputs) (regs : List ℤ)
+select-stmt-correct : ∀ (s : CStmt) (ρ : Env ℤ) (inputs : Inputs) (regs : List ℤ)
   → CStmtOK s (length ρ)
   → DestOK (Reg rax) (length ρ) (length regs)
   → OutSync (interp-stmt s ρ inputs) (interp-insts (select-stmt s) (inputs , regs , ρ))
