@@ -22,6 +22,7 @@ data UniOp : Set where
 
 data BinOp : Set where
   Sub : BinOp
+  Eq : BinOp
   LessEq : BinOp
   And : BinOp
 
@@ -38,6 +39,63 @@ data Exp : Set where
 data Value : Set where
   Int : ℤ → Value
   Bool : 𝔹 → Value
+
+data Type : Set where
+  IntT : Type
+  BoolT : Type
+
+TypeEnv : Set
+TypeEnv = List Type
+
+wt-uniop : UniOp → Type → Maybe Type
+wt-uniop Neg IntT = just IntT
+wt-uniop Neg BoolT = nothing
+wt-uniop Not IntT = nothing
+wt-uniop NOt BoolT = just BoolT
+
+wt-binop : BinOp → Type → Type → Maybe Type
+wt-binop Sub IntT IntT = just IntT
+wt-binop Sub IntT BoolT = nothing
+wt-binop Sub BoolT t2 = nothing
+wt-binop Eq IntT IntT = just BoolT
+wt-binop Eq IntT BoolT = nothing
+wt-binop Eq BoolT IntT = nothing
+wt-binop Eq BoolT BoolT = just BoolT
+wt-binop LessEq IntT IntT = just BoolT
+wt-binop LessEq IntT BoolT = nothing
+wt-binop LessEq BoolT t2 = nothing
+wt-binop And IntT t2 = nothing
+wt-binop And BoolT IntT = nothing
+wt-binop And BoolT BoolT = just BoolT
+
+--- Type System for LIf
+
+infix 4 _⊢_⦂_
+data _⊢_⦂_ : TypeEnv → Exp → Type → Set where
+  wt-num : ∀ {Γ n} → Γ ⊢ Num n ⦂ IntT
+  wt-bool : ∀ {Γ b} → Γ ⊢ Bool b ⦂ BoolT
+  wt-read : ∀ {Γ} → Γ ⊢ Read ⦂ IntT
+  wt-uni : ∀ {Γ op e T₁ T}
+    → Γ ⊢ e ⦂ T₁
+    → wt-uniop op T₁ ≡ just T
+    → Γ ⊢ Uni op e ⦂ T
+  wt-bin : ∀ {Γ op e₁ e₂ T₁ T₂ T}
+    → Γ ⊢ e₁ ⦂ T₁
+    → Γ ⊢ e₂ ⦂ T₂
+    → wt-binop op T₁ T₂ ≡ just T
+    → Γ ⊢ Bin op e₁ e₂ ⦂ T
+  wt-var : ∀ {Γ x T}
+    → nth Γ x ≡ just T
+    → Γ ⊢ Var x ⦂ T
+  wt-let : ∀ {Γ e₁ e₂ T₁ T}
+    → Γ ⊢ e₁ ⦂ T₁
+    → T₁ ∷ Γ ⊢ e₂ ⦂ T
+    → Γ ⊢ Let e₁ e₂ ⦂ T
+  wt-if : ∀ {Γ e₁ e₂ e₃ T}
+    → Γ ⊢ e₁ ⦂ BoolT
+    → Γ ⊢ e₂ ⦂ T
+    → Γ ⊢ e₃ ⦂ T
+    → Γ ⊢ If e₁ e₂ e₃ ⦂ T
 
 toInt : Value → Maybe ℤ
 toInt (Int n) = just n
@@ -60,6 +118,10 @@ binop Sub v₁ v₂ =
   try (toInt v₁) then
   λ n₁ → try (toInt v₂) then
   λ n₂ → return (Int (n₁ - n₂))
+binop Eq v₁ v₂ =
+  try (toInt v₁) then
+  λ n₁ → try (toInt v₂) then
+  λ n₂ → return (Bool ((n₁ ≤ᵇ n₂) ∧ (n₂ ≤ᵇ n₁)))
 binop LessEq v₁ v₂ =
   try (toInt v₁) then
   λ n₁ → try (toInt v₂) then
@@ -108,6 +170,41 @@ data Mon : Set where
   Let : Mon → Mon → Mon
   If : Mon → Mon → Mon → Mon
 
+--- Type System for LMonIf
+
+infix 4 _⊢ᵃ_⦂_
+data _⊢ᵃ_⦂_ : TypeEnv → Atm → Type → Set where
+  wt-num : ∀ {Γ n} → Γ ⊢ᵃ Num n ⦂ IntT
+  wt-bool : ∀ {Γ b} → Γ ⊢ᵃ Bool b ⦂ BoolT
+  wt-var : ∀ {Γ x T}
+    → nth Γ x ≡ just T
+    → Γ ⊢ᵃ Var x ⦂ T
+  
+infix 4 _⊢ᵐ_⦂_
+data _⊢ᵐ_⦂_ : TypeEnv → Mon → Type → Set where
+  wt-atom : ∀ {Γ a T}
+    → Γ ⊢ᵃ a ⦂ T
+    → Γ ⊢ᵐ Atom a ⦂ T
+  wt-read : ∀ {Γ} → Γ ⊢ᵐ Read ⦂ IntT
+  wt-uni : ∀ {Γ op a T₁ T}
+    → Γ ⊢ᵃ a ⦂ T₁
+    → wt-uniop op T₁ ≡ just T
+    → Γ ⊢ᵐ Uni op a ⦂ T
+  wt-bin : ∀ {Γ op a₁ a₂ T₁ T₂ T}
+    → Γ ⊢ᵃ a₁ ⦂ T₁
+    → Γ ⊢ᵃ a₂ ⦂ T₂
+    → wt-binop op T₁ T₂ ≡ just T
+    → Γ ⊢ᵐ Bin op a₁ a₂ ⦂ T
+  wt-let : ∀ {Γ e₁ e₂ T₁ T}
+    → Γ ⊢ᵐ e₁ ⦂ T₁
+    → T₁ ∷ Γ ⊢ᵐ e₂ ⦂ T
+    → Γ ⊢ᵐ Let e₁ e₂ ⦂ T
+  wt-if : ∀ {Γ e₁ e₂ e₃ T}
+    → Γ ⊢ᵐ e₁ ⦂ BoolT
+    → Γ ⊢ᵐ e₂ ⦂ T
+    → Γ ⊢ᵐ e₃ ⦂ T
+    → Γ ⊢ᵐ If e₁ e₂ e₃ ⦂ T
+    
 interp-atm : Atm → Env Value → Maybe Value
 interp-atm (Num n) ρ = just (Int n)
 interp-atm (Bool b) ρ = just (Bool b)
@@ -164,3 +261,195 @@ rco (Bin op e₁ e₂) =
 rco (Var i) = Atom (Var i)
 rco (Let e₁ e₂) = Let (rco e₁) (rco e₂)
 rco (If e₁ e₂ e₃) = If (rco e₁) (rco e₂) (rco e₃)
+
+----------------- Definition of CIf ----------------------------
+
+data CExp : Set where
+  Atom : Atm → CExp
+  Read : CExp
+  Uni : UniOp → Atm → CExp
+  Bin : BinOp → Atm → Atm → CExp
+
+data CTail : Set where
+  Return : CExp → CTail
+  Let : CExp → CTail → CTail
+  If : BinOp → Atm → Atm → Id → Id → CTail
+  Goto : Id → CTail
+
+Blocks : Set
+Blocks = List CTail
+
+CProgram : Set
+CProgram = TypeEnv × Blocks
+
+--- Type System for CIf
+
+infix 4 _⊢ᵉ_⦂_
+data _⊢ᵉ_⦂_ : TypeEnv → CExp → Type → Set where
+  wt-atom : ∀ {Γ a T}
+    → Γ ⊢ᵃ a ⦂ T
+    → Γ ⊢ᵉ Atom a ⦂ T
+  wt-read : ∀ {Γ} → Γ ⊢ᵉ Read ⦂ IntT
+  wt-uni : ∀ {Γ op a T₁ T}
+    → Γ ⊢ᵃ a ⦂ T₁
+    → wt-uniop op T₁ ≡ just T
+    → Γ ⊢ᵉ Uni op a ⦂ T
+  wt-bin : ∀ {Γ op a₁ a₂ T₁ T₂ T}
+    → Γ ⊢ᵃ a₁ ⦂ T₁
+    → Γ ⊢ᵃ a₂ ⦂ T₂
+    → wt-binop op T₁ T₂ ≡ just T
+    → Γ ⊢ᵉ Bin op a₁ a₂ ⦂ T
+
+infix 4 _⊢ᵗ_
+data _⊢ᵗ_ : TypeEnv → CTail → Set where
+  wt-return : ∀ {Γ e }
+    → Γ ⊢ᵉ e ⦂ IntT
+    → Γ ⊢ᵗ Return e
+  wt-let : ∀ {Γ e t T₁}
+    → Γ ⊢ᵉ e ⦂ T₁
+    → (T₁ ∷ Γ) ⊢ᵗ t
+    → Γ ⊢ᵗ Let e t
+  wt-if : ∀ {Γ op a₁ a₂ thn els T₁ T₂}
+    → Γ ⊢ᵃ a₁ ⦂ T₁
+    → Γ ⊢ᵃ a₂ ⦂ T₂
+    → wt-binop op T₁ T₂ ≡ just BoolT
+    → Γ ⊢ᵗ If op a₁ a₂ thn els
+
+wt-blocks : TypeEnv → Blocks → Set
+wt-blocks Γ [] = ⊤
+wt-blocks Γ (b ∷ bs) = Γ ⊢ᵗ b × wt-blocks Γ bs
+
+wt-prog : CProgram → Set
+wt-prog (Γ , bs) = wt-blocks Γ bs
+
+--- Interpreter for CIf
+
+interp-CExp : CExp → Env Value → Reader Value
+interp-CExp (Atom atm) ρ = try (interp-atm atm ρ)
+interp-CExp Read ρ = read-int Int
+interp-CExp (Uni op a) ρ =
+  try (interp-atm a ρ) then
+  λ v → uniop op v
+interp-CExp (Bin op a₁ a₂) ρ =
+  try (interp-atm a₁ ρ) then
+  λ v₁ → try (interp-atm a₂ ρ) then
+  λ v₂ → binop op v₁ v₂
+
+interp-tail : ℕ → CTail → Env Value → Blocks → Reader Value
+interp-tail 0 e ρ B = timeout
+interp-tail (suc n) (Return e) ρ B = interp-CExp e ρ
+interp-tail (suc n) (Let e t) ρ B =
+  (interp-CExp e ρ) then
+  λ v₁ → interp-tail n t (v₁ ∷ ρ) B
+interp-tail (suc n) (If op a₁ a₂ thn els) ρ B =
+  try (interp-atm a₁ ρ) then
+  λ v₁ → try (interp-atm a₂ ρ) then
+  λ v₂ → binop op v₁ v₂ then
+  λ v₃ → try (toBool v₃) then
+  λ { true →
+        try (nth B thn) then
+        λ t → interp-tail n t ρ B
+    ; false →
+        try (nth B els) then
+        λ t → interp-tail n t ρ B }
+interp-tail (suc n) (Goto lbl) ρ B =
+     try (nth B lbl) then
+     λ t → interp-tail n t ρ B
+  
+interp-CIf : ℕ → Blocks → Inputs → Maybe Value
+interp-CIf n B s = run (try (last B) then
+                        λ t → interp-tail n t [] B) s
+
+--- Variable Shifting for CIf
+
+shift-exp : CExp → ℕ → CExp
+shift-exp (Atom atm) c = Atom (shift-atm atm c)
+shift-exp Read c = Read
+shift-exp (Uni op a) c = Uni op (shift-atm a c)
+shift-exp (Bin op a₁ a₂) c = Bin op (shift-atm a₁ c) (shift-atm a₂ c)
+
+shift-tail : CTail → ℕ → CTail
+shift-tail (Return e) c = Return (shift-exp e c)
+shift-tail (Let e t) c = Let (shift-exp e c) (shift-tail t (suc c))
+shift-tail (If op a₁ a₂ thn els) c =
+  If op (shift-atm a₁ c) (shift-atm a₂ c) thn els
+shift-tail (Goto lbl) c = Goto lbl
+
+----------------- Explicate Control ----------------------------
+
+-- Block Monad
+-- Next label to use for a new block
+-- The list of blocks that have been created
+
+Blocker : Set → Set
+Blocker A = Blocks → A × Blocks
+
+returnB : ∀{A : Set} → A → Blocker A
+returnB a s = a , s
+
+_thenB_ : ∀{A B : Set} → Blocker A → (A → Blocker B) → Blocker B
+(M thenB g) s
+    with M s
+... | (v , s') = g v s'
+
+create-block : CTail → Blocker Id
+create-block (Goto lbl) B = lbl , B
+create-block t B = length B , (B ++ [ t ])
+
+explicate-let : Mon → CTail → Blocker CTail
+explicate-pred : Mon → CTail → CTail → Blocker CTail
+explicate-tail : Mon → Blocker CTail
+
+explicate-let (Atom a) rest = returnB (Let (Atom a) rest  )
+explicate-let Read rest = returnB (Let Read rest)
+explicate-let (Uni op a) rest = returnB (Let (Uni op a) rest)
+explicate-let (Bin op a₁ a₂) rest = returnB (Let (Bin op a₁ a₂) rest)
+explicate-let (Let m₁ m₂) rest =
+  explicate-let m₂ (shift-tail rest 1) thenB
+  λ t₂ → explicate-let m₁ t₂
+explicate-let (If m₁ m₂ m₃) rest =
+   create-block rest thenB
+   λ l → explicate-let m₂ (Goto l) thenB
+   λ t₂ → explicate-let m₃ (Goto l) thenB
+   λ t₃ → explicate-pred m₁ t₂ t₃
+
+explicate-pred (Atom a) thn els =
+  create-block thn thenB
+  λ l₁ → create-block els thenB
+  λ l₂ → returnB (If Eq a (Bool true) l₁ l₂)
+explicate-pred Read thn els = returnB (Return (Atom (Num 0ℤ)))
+explicate-pred (Uni Neg a) thn els = returnB (Return (Atom (Num 0ℤ)))
+explicate-pred (Uni Not a) thn els = explicate-pred (Atom a) els thn
+explicate-pred (Bin op a₁ a₂) thn els =
+  create-block thn thenB
+  λ lbl-thn → create-block els thenB
+  λ lbl-els → returnB (If op a₁ a₂ lbl-thn lbl-els)
+explicate-pred (Let m₁ m₂) thn els =
+  explicate-pred m₂ (shift-tail thn 1) (shift-tail els 1) thenB
+  λ rest' → explicate-let m₁ rest'
+explicate-pred (If m₁ m₂ m₃) thn els =
+    create-block thn thenB
+   λ lbl-thn → create-block els thenB
+   λ lbl-els → explicate-pred m₂ (Goto lbl-thn) (Goto lbl-els) thenB
+   λ t₂ → (explicate-pred m₃ (Goto lbl-thn) (Goto lbl-els)) thenB
+   λ t₃ → explicate-pred m₁ t₂ t₃
+
+explicate-tail (Atom a) = returnB (Return (Atom a))
+explicate-tail Read = returnB (Return Read)
+explicate-tail (Uni op a) = returnB (Return (Uni op a))
+explicate-tail (Bin op a₁ a₂) = returnB (Return (Bin op a₁ a₂))
+explicate-tail (Let m₁ m₂) =
+  explicate-tail m₂ thenB
+  λ t₂ → explicate-let m₁ t₂
+explicate-tail (If m₁ m₂ m₃) =
+  (explicate-tail m₂) thenB
+  λ t₂ → (explicate-tail m₃) thenB
+  λ t₃ → explicate-pred m₁ t₂ t₃
+
+explicate : Mon → Blocks
+explicate m = proj₂ (((explicate-tail m) thenB
+                      (λ t → create-block t)) [])
+
+
+
+      

@@ -106,7 +106,7 @@ eq-true-top {P} eq rewrite eq = tt
 eq-false-not-top : ∀{P} → P ≡ false → ¬ Data.Bool.T P
 eq-false-not-top {P} eq rewrite eq = λ {()}
 
-nth-++-shift-var : ∀{A : Set} (ρ₁ ρ₂ : Env A) (v : A) (x : Id)
+nth-++-shift-var : ∀{A : Set} (ρ₁ ρ₂ : List A) (v : A) (x : Id)
   → nth (ρ₁ ++ v ∷ ρ₂) (shift-var x (length ρ₁))
     ≡ nth (ρ₁ ++ ρ₂) x
 nth-++-shift-var ρ₁ ρ₂ v x

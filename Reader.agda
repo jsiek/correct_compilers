@@ -34,6 +34,9 @@ read-int inj (i , f) = just (inj (f i) , (suc i , f))
 return : ∀{A : Set} → A → Reader A
 return a s = just (a , s)
 
+timeout : ∀{A : Set} → Reader A
+timeout s = nothing
+
 try : ∀{A : Set} → Maybe A → Reader A
 try (just x) s = just (x , s)
 try nothing s = nothing
