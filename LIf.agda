@@ -40,63 +40,6 @@ data Value : Set where
   Int : ℤ → Value
   Bool : 𝔹 → Value
 
-data Type : Set where
-  IntT : Type
-  BoolT : Type
-
-TypeEnv : Set
-TypeEnv = List Type
-
-wt-uniop : UniOp → Type → Maybe Type
-wt-uniop Neg IntT = just IntT
-wt-uniop Neg BoolT = nothing
-wt-uniop Not IntT = nothing
-wt-uniop NOt BoolT = just BoolT
-
-wt-binop : BinOp → Type → Type → Maybe Type
-wt-binop Sub IntT IntT = just IntT
-wt-binop Sub IntT BoolT = nothing
-wt-binop Sub BoolT t2 = nothing
-wt-binop Eq IntT IntT = just BoolT
-wt-binop Eq IntT BoolT = nothing
-wt-binop Eq BoolT IntT = nothing
-wt-binop Eq BoolT BoolT = just BoolT
-wt-binop LessEq IntT IntT = just BoolT
-wt-binop LessEq IntT BoolT = nothing
-wt-binop LessEq BoolT t2 = nothing
-wt-binop And IntT t2 = nothing
-wt-binop And BoolT IntT = nothing
-wt-binop And BoolT BoolT = just BoolT
-
---- Type System for LIf
-
-infix 4 _⊢_⦂_
-data _⊢_⦂_ : TypeEnv → Exp → Type → Set where
-  wt-num : ∀ {Γ n} → Γ ⊢ Num n ⦂ IntT
-  wt-bool : ∀ {Γ b} → Γ ⊢ Bool b ⦂ BoolT
-  wt-read : ∀ {Γ} → Γ ⊢ Read ⦂ IntT
-  wt-uni : ∀ {Γ op e T₁ T}
-    → Γ ⊢ e ⦂ T₁
-    → wt-uniop op T₁ ≡ just T
-    → Γ ⊢ Uni op e ⦂ T
-  wt-bin : ∀ {Γ op e₁ e₂ T₁ T₂ T}
-    → Γ ⊢ e₁ ⦂ T₁
-    → Γ ⊢ e₂ ⦂ T₂
-    → wt-binop op T₁ T₂ ≡ just T
-    → Γ ⊢ Bin op e₁ e₂ ⦂ T
-  wt-var : ∀ {Γ x T}
-    → nth Γ x ≡ just T
-    → Γ ⊢ Var x ⦂ T
-  wt-let : ∀ {Γ e₁ e₂ T₁ T}
-    → Γ ⊢ e₁ ⦂ T₁
-    → T₁ ∷ Γ ⊢ e₂ ⦂ T
-    → Γ ⊢ Let e₁ e₂ ⦂ T
-  wt-if : ∀ {Γ e₁ e₂ e₃ T}
-    → Γ ⊢ e₁ ⦂ BoolT
-    → Γ ⊢ e₂ ⦂ T
-    → Γ ⊢ e₃ ⦂ T
-    → Γ ⊢ If e₁ e₂ e₃ ⦂ T
-
 toInt : Value → Maybe ℤ
 toInt (Int n) = just n
 toInt (Bool b) = nothing
@@ -170,41 +113,6 @@ data Mon : Set where
   Let : Mon → Mon → Mon
   If : Mon → Mon → Mon → Mon
 
---- Type System for LMonIf
-
-infix 4 _⊢ᵃ_⦂_
-data _⊢ᵃ_⦂_ : TypeEnv → Atm → Type → Set where
-  wt-num : ∀ {Γ n} → Γ ⊢ᵃ Num n ⦂ IntT
-  wt-bool : ∀ {Γ b} → Γ ⊢ᵃ Bool b ⦂ BoolT
-  wt-var : ∀ {Γ x T}
-    → nth Γ x ≡ just T
-    → Γ ⊢ᵃ Var x ⦂ T
-  
-infix 4 _⊢ᵐ_⦂_
-data _⊢ᵐ_⦂_ : TypeEnv → Mon → Type → Set where
-  wt-atom : ∀ {Γ a T}
-    → Γ ⊢ᵃ a ⦂ T
-    → Γ ⊢ᵐ Atom a ⦂ T
-  wt-read : ∀ {Γ} → Γ ⊢ᵐ Read ⦂ IntT
-  wt-uni : ∀ {Γ op a T₁ T}
-    → Γ ⊢ᵃ a ⦂ T₁
-    → wt-uniop op T₁ ≡ just T
-    → Γ ⊢ᵐ Uni op a ⦂ T
-  wt-bin : ∀ {Γ op a₁ a₂ T₁ T₂ T}
-    → Γ ⊢ᵃ a₁ ⦂ T₁
-    → Γ ⊢ᵃ a₂ ⦂ T₂
-    → wt-binop op T₁ T₂ ≡ just T
-    → Γ ⊢ᵐ Bin op a₁ a₂ ⦂ T
-  wt-let : ∀ {Γ e₁ e₂ T₁ T}
-    → Γ ⊢ᵐ e₁ ⦂ T₁
-    → T₁ ∷ Γ ⊢ᵐ e₂ ⦂ T
-    → Γ ⊢ᵐ Let e₁ e₂ ⦂ T
-  wt-if : ∀ {Γ e₁ e₂ e₃ T}
-    → Γ ⊢ᵐ e₁ ⦂ BoolT
-    → Γ ⊢ᵐ e₂ ⦂ T
-    → Γ ⊢ᵐ e₃ ⦂ T
-    → Γ ⊢ᵐ If e₁ e₂ e₃ ⦂ T
-    
 interp-atm : Atm → Env Value → Maybe Value
 interp-atm (Num n) ρ = just (Int n)
 interp-atm (Bool b) ρ = just (Bool b)
@@ -279,48 +187,12 @@ data CTail : Set where
 Blocks : Set
 Blocks = List CTail
 
+data Type : Set where
+  IntT : Type
+  BoolT : Type
+
 CProgram : Set
-CProgram = TypeEnv × Blocks
-
---- Type System for CIf
-
-infix 4 _⊢ᵉ_⦂_
-data _⊢ᵉ_⦂_ : TypeEnv → CExp → Type → Set where
-  wt-atom : ∀ {Γ a T}
-    → Γ ⊢ᵃ a ⦂ T
-    → Γ ⊢ᵉ Atom a ⦂ T
-  wt-read : ∀ {Γ} → Γ ⊢ᵉ Read ⦂ IntT
-  wt-uni : ∀ {Γ op a T₁ T}
-    → Γ ⊢ᵃ a ⦂ T₁
-    → wt-uniop op T₁ ≡ just T
-    → Γ ⊢ᵉ Uni op a ⦂ T
-  wt-bin : ∀ {Γ op a₁ a₂ T₁ T₂ T}
-    → Γ ⊢ᵃ a₁ ⦂ T₁
-    → Γ ⊢ᵃ a₂ ⦂ T₂
-    → wt-binop op T₁ T₂ ≡ just T
-    → Γ ⊢ᵉ Bin op a₁ a₂ ⦂ T
-
-infix 4 _⊢ᵗ_
-data _⊢ᵗ_ : TypeEnv → CTail → Set where
-  wt-return : ∀ {Γ e }
-    → Γ ⊢ᵉ e ⦂ IntT
-    → Γ ⊢ᵗ Return e
-  wt-let : ∀ {Γ e t T₁}
-    → Γ ⊢ᵉ e ⦂ T₁
-    → (T₁ ∷ Γ) ⊢ᵗ t
-    → Γ ⊢ᵗ Let e t
-  wt-if : ∀ {Γ op a₁ a₂ thn els T₁ T₂}
-    → Γ ⊢ᵃ a₁ ⦂ T₁
-    → Γ ⊢ᵃ a₂ ⦂ T₂
-    → wt-binop op T₁ T₂ ≡ just BoolT
-    → Γ ⊢ᵗ If op a₁ a₂ thn els
-
-wt-blocks : TypeEnv → Blocks → Set
-wt-blocks Γ [] = ⊤
-wt-blocks Γ (b ∷ bs) = Γ ⊢ᵗ b × wt-blocks Γ bs
-
-wt-prog : CProgram → Set
-wt-prog (Γ , bs) = wt-blocks Γ bs
+CProgram = List Type × Blocks
 
 --- Interpreter for CIf
 

@@ -52,3 +52,11 @@ run r s
     with r s
 ... | nothing = nothing
 ... | just (v , s) = just v
+
+then-timeout : ∀ {A B : Set} (M : Reader A) (s : Inputs)
+  → (M then (λ v → timeout {B})) s ≡ timeout s
+then-timeout M s
+    with M s
+... | nothing = refl
+... | just (v , s') = refl
+
