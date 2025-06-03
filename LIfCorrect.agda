@@ -132,9 +132,142 @@ rco-correct e s rewrite rco-correct-exp e [] = refl
 
 --------------- Proof of correctness for Explicate Control -------------------
 
+_↝_ : Blocks → Blocks → Set
+B₁ ↝ B₂ = Σ[ B ∈ Blocks ] B₁ ++ B ≡ B₂
+
+↝-trans : ∀ {B₁ B₂ B₃ : Blocks}
+  → B₁ ↝ B₂  → B₂ ↝ B₃
+  → B₁ ↝ B₃
+↝-trans {B₁}{B₂}{B₃} (B , eq12) (B' , eq23)
+  rewrite sym eq12 | sym eq23  | ++-assoc B₁ B B'
+  = B ++ B' , refl
+
+↝-create-block : (t : CTail) (B B' : Blocks) (lbl : ℕ)
+  → create-block t B ≡ (lbl , B')
+  → B ↝ B'
+↝-create-block (Return x) B B' lbl refl = [ Return x ] , refl
+↝-create-block (Let x t) B B' lbl refl = [ Let x t ] , refl
+↝-create-block (If x x₁ x₂ x₃ x₄) B B' lbl refl = [ If x x₁ x₂ x₃ x₄ ] , refl
+↝-create-block (Goto lbl) B B lbl refl = [] , (++-identityʳ B)
+
+
+explicate-tail-blocks : ∀ (m : Mon) (B₁ B₂ : Blocks) (t : CTail)
+  → explicate-tail m B₁ ≡ (t , B₂)
+  → B₁ ↝ B₂
+
+explicate-let-blocks : ∀ (m : Mon) (t t' : CTail) (B₁ B₂ : Blocks)
+  → explicate-let m t B₁ ≡ (t' , B₂)
+  → B₁ ↝ B₂
+
+explicate-pred-blocks : ∀ (m : Mon) (t₁ t₂ t : CTail) (B₁ B₂ : Blocks)
+  → explicate-pred m t₁ t₂ B₁ ≡ (t , B₂)
+  → B₁ ↝ B₂
+
+explicate-tail-blocks (Atom a) B₁ B₂ t refl = [] , (++-identityʳ B₁)
+explicate-tail-blocks Read B₁ B₂ t refl = [] , (++-identityʳ B₁)
+explicate-tail-blocks (Uni op a) B₁ B₂ t refl = [] , ++-identityʳ B₁
+explicate-tail-blocks (Bin op a₁ a₂) B₁ B₂ t refl = [] , ++-identityʳ B₁
+explicate-tail-blocks (Let m₁ m₂) B₁ B₂ t refl
+    with explicate-tail m₂ B₁ in et
+... | (t₂ , B)
+    with explicate-let m₁ t₂ B in el
+... | (t₁ , B') =
+  let B₁↝B = explicate-tail-blocks m₂ B₁ B t₂ et in
+  let B↝B' = explicate-let-blocks m₁ t₂ t₁ B B' el in
+  ↝-trans B₁↝B B↝B'
+explicate-tail-blocks (If m₁ m₂ m₃) B₁ B₂ t et
+    with explicate-tail m₂ B₁ in et2
+... | (t₂ , B)
+    with explicate-tail m₃ B in et3
+... | (t₃ , B') =
+    let B₁↝B = explicate-tail-blocks m₂ B₁ B t₂ et2 in
+    let B↝B' = explicate-tail-blocks m₃ B B' t₃ et3 in
+    let B'↝B₂ = explicate-pred-blocks m₁ t₂ t₃ t B' B₂ et in
+    ↝-trans B₁↝B (↝-trans B↝B' B'↝B₂)
+
+explicate-let-blocks (Atom a) t t' B₁ B₂ refl = [] , ++-identityʳ B₁
+explicate-let-blocks Read t t' B₁ B₂ refl = [] , (++-identityʳ B₁)
+explicate-let-blocks (Uni op a) t t' B₁ B₂ refl = [] , ++-identityʳ B₁
+explicate-let-blocks (Bin op a₁ a₂) t t' B₁ B₂ refl = [] , ++-identityʳ B₁
+explicate-let-blocks (Let m₁ m₂) t t' B₁ B₂ el1
+    with explicate-let m₂ (shift-tail t 1) B₁ in el2
+... | (t₂ , B) =
+  let B₁↝B = explicate-let-blocks m₂ (shift-tail t 1) t₂ B₁ B el2 in
+  let B↝B₂ = explicate-let-blocks m₁ t₂ t' B B₂ el1 in
+  ↝-trans B₁↝B B↝B₂ 
+explicate-let-blocks (If m₁ m₂ m₃) t t' B₁ B₂ el
+    with create-block t B₁ in cb1
+... | cont , B
+    with explicate-let m₂ (Goto cont) B in el2
+... | t₂ , B'
+    with explicate-let m₃ (Goto cont) B' in el3
+... | t₃ , B'' =
+    let B₁↝B = ↝-create-block t B₁ B cont cb1 in
+    let B↝B' = explicate-let-blocks m₂ (Goto cont) t₂ B B' el2 in
+    let B'↝B'' = explicate-let-blocks m₃ (Goto cont) t₃ B' B'' el3 in
+    let B''↝B₂ = explicate-pred-blocks m₁ t₂ t₃ t' B'' B₂ el in
+    ↝-trans B₁↝B (↝-trans B↝B' (↝-trans B'↝B'' B''↝B₂))
+
+explicate-pred-blocks (Atom a) t₁ t₂ t B₁ B₂ ep
+    with create-block t₁ B₁ in cb1
+... | l1 , B
+    with create-block t₂ B in cb2
+... | l2 , B'
+    with ep
+... | refl =
+    let B₁↝B = ↝-create-block t₁ B₁ B l1 cb1 in
+    let B↝B' = ↝-create-block t₂ B B' l2 cb2 in
+    ↝-trans B₁↝B B↝B'
+explicate-pred-blocks Read t₁ t₂ t B₁ B₂ refl = [] , ++-identityʳ B₁ 
+explicate-pred-blocks (Uni Neg a) t₁ t₂ t B₁ B₂ refl = [] , (++-identityʳ B₁)
+explicate-pred-blocks (Uni Not a) t₁ t₂ t B₁ B₂ ep
+    with create-block t₂ B₁ in cb2
+... | l2 , B
+    with create-block t₁ B in cb1
+... | l1 , B'
+    with ep
+... | refl =
+    let B₁↝B = ↝-create-block t₂ B₁ B l2 cb2 in
+    let B↝B' = ↝-create-block t₁ B B' l1 cb1 in
+    ↝-trans B₁↝B B↝B'
+explicate-pred-blocks (Bin op a₁ a₂) t₁ t₂ t B₁ B₂ ep
+    with create-block t₁ B₁ in cb1
+... | l1 , B
+    with create-block t₂ B in cb2
+... | l2 , B'
+    with ep
+... | refl =
+    let B₁↝B = ↝-create-block t₁ B₁ B l1 cb1 in
+    let B↝B' = ↝-create-block t₂ B B' l2 cb2 in
+    ↝-trans B₁↝B B↝B'
+explicate-pred-blocks (Let m₁ m₂) thn els t B₁ B₂ ep
+    with explicate-pred m₂ (shift-tail thn 1) (shift-tail els 1) B₁ in el2
+... | (t₂ , B)
+    =
+    let B₁↝B = explicate-pred-blocks m₂ (shift-tail thn 1) (shift-tail els 1) t₂ B₁ B el2 in
+    let B↝B₂ = explicate-let-blocks m₁ t₂ t B B₂ ep in
+    ↝-trans B₁↝B B↝B₂ 
+explicate-pred-blocks (If m₁ m₂ m₃) thn els t B₁ B₂ ep
+    with create-block thn B₁ in cb1
+... | lbl-thn , B
+    with create-block els B in cb2
+... | lbl-els , B'
+    with explicate-pred m₂ (Goto lbl-thn) (Goto lbl-els) B' in ep2
+... | t₂ , B''
+    with explicate-pred m₃ (Goto lbl-thn) (Goto lbl-els) B'' in ep3
+... | t₃ , B'''
+    =
+    let B₁↝B = ↝-create-block thn B₁ B lbl-thn cb1 in
+    let B↝B' = ↝-create-block els B B' lbl-els cb2 in
+    let B'↝B'' = explicate-pred-blocks m₂ (Goto lbl-thn) (Goto lbl-els) t₂ B' B'' ep2 in
+    let B''↝B''' = explicate-pred-blocks m₃ (Goto lbl-thn) (Goto lbl-els) t₃ B'' B''' ep3 in
+    let B'''↝B₂ = explicate-pred-blocks m₁ t₂ t₃ t B''' B₂ ep in
+    ↝-trans B₁↝B (↝-trans B↝B' (↝-trans B'↝B'' (↝-trans B''↝B''' B'''↝B₂)))
+
 -- TODO: add the premise: B₁ is a prefix of B₂
 postulate interp-tail-blocks : ∀ (n : ℕ) (t : CTail) (ρ : Env Value) (B₁ B₂ : Blocks) (s : Inputs) → interp-tail n t ρ B₁ s ≡ interp-tail n t ρ B₂ s
 
+-- Problem: this isn't true... increasing the gas could turn a timeout into a good result...
 postulate interp-tail-mono : ∀ (n n' : ℕ)(t : CTail) (ρ : Env Value) (B : Blocks) (s : Inputs) → n ≤ n' → interp-tail n t ρ B s ≡ interp-tail n' t ρ B s
 
 postulate interp-shift-tail : ∀ (n : ℕ) (t : CTail) (v : Value) (ρ₁ ρ₂ : Env Value) (B : Blocks) (s : Inputs) → interp-tail n (shift-tail t (length ρ₁)) (ρ₁ ++ (v ∷ ρ₂)) B s ≡ interp-tail n t (ρ₁ ++ ρ₂) B s
