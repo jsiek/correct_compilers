@@ -232,6 +232,32 @@ interp-CIf : ℕ → Blocks → Inputs → Maybe Value
 interp-CIf n B s = run (try (last B) then
                         λ t → interp-tail n t [] B) s
 
+--- Big-step Semantics for CIf
+
+infix 4 _,_,_⊢_⇓_
+data _,_,_⊢_⇓_ : Env Value → Inputs → Blocks → CTail → Maybe (Value × Inputs) → Set where
+   return-⇓ : ∀{ρ}{s}{B}{e}{r}
+       → interp-CExp e ρ s ≡ r
+       → ρ , s , B ⊢ Return e ⇓ r
+   let-⇓ : ∀{ρ}{B}{e}{t}{s0 s1 : Inputs}{v}{r : Maybe (Value × Inputs)}
+       → interp-CExp e ρ s0 ≡ just (v , s1)
+       → v ∷ ρ , s1 , B ⊢ t ⇓ r
+       → ρ , s0 , B ⊢ Let e t ⇓ r
+   if-⇓-true : ∀{ρ}{B}{op}{a₁ a₂ : Atm}{thn}{els}{s0 s1 : Inputs}{t-thn : CTail }{r : Maybe (Value × Inputs)}
+       → interp-CExp (Bin op a₁ a₂) ρ s0 ≡ just (Bool true , s1)
+       → nth B thn ≡ just t-thn
+       → ρ , s1 , B ⊢ t-thn ⇓ r
+       → ρ , s0 , B ⊢ If op a₁ a₂ thn els ⇓ r
+   if-⇓-false : ∀{ρ}{B}{op}{a₁ a₂ : Atm}{thn}{els}{s0 s1 : Inputs}{t-els : CTail }{r : Maybe (Value × Inputs)}
+       → interp-CExp (Bin op a₁ a₂) ρ s0 ≡ just (Bool true , s1)
+       → nth B els ≡ just t-els
+       → ρ , s1 , B ⊢ t-els ⇓ r
+       → ρ , s0 , B ⊢ If op a₁ a₂ thn els ⇓ r
+   goto-⇓ : ∀{ρ}{B}{s0 : Inputs}{lbl}{t : CTail}{r : Maybe (Value × Inputs)}
+       → nth B lbl ≡ just t
+       → ρ , s0 , B ⊢ t ⇓ r
+       → ρ , s0 , B ⊢ Goto lbl ⇓ r
+
 --- Variable Shifting for CIf
 
 shift-exp : CExp → ℕ → CExp
