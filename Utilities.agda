@@ -7,6 +7,7 @@ open import Data.Nat.Properties
 open import Data.Product
 open import Data.Integer using (ℤ; -_; _-_; 0ℤ)
 open import Data.List
+--open import Data.List.Properties using (++-assoc)
 open import Data.Maybe
 open import Relation.Binary.PropositionalEquality
    using (_≡_; refl; trans; sym; cong; cong-app)
@@ -35,6 +36,12 @@ shift-var : Id → ℕ → Id
 shift-var x c
     with c Data.Nat.≤ᵇ x
 ... | true = suc x
+... | false = x
+
+shifts-var : Id → ℕ → ℕ → Id
+shifts-var x c n
+    with c Data.Nat.≤ᵇ x
+... | true = n + x
 ... | false = x
 
 --- Properties
@@ -87,6 +94,11 @@ nth-++-+ : ∀{A : Set} → (xs ys : List A) (n : ℕ)
 nth-++-+ {A} [] ys n = refl
 nth-++-+ {A} (x ∷ xs) ys n = nth-++-+ xs ys n
 
+nth-++-just : ∀{A : Set} (xs ys : List A) (i : ℕ) (v : A)
+  → nth xs i ≡ just v
+  → nth (xs ++ ys) i ≡ just v
+nth-++-just (x ∷ xs) ys zero v eq = eq
+nth-++-just (x ∷ xs) ys (suc i) v eq = nth-++-just xs ys i v eq
 
 nth-update : ∀ {A : Set} (ρ : List A) (x : Id) (v : A)
   → x < length ρ
@@ -120,6 +132,49 @@ nth-++-shift-var ρ₁ ρ₂ v x
     rewrite nth-++-< ρ₁ ρ₂ x (≰⇒> λ x₁ → (eq-false-not-top lt) (≤⇒≤ᵇ x₁))
     | nth-++-< ρ₁ (v ∷ ρ₂) x ((≰⇒> λ x₁ → (eq-false-not-top lt) (≤⇒≤ᵇ x₁))) =
    refl  
+
+nth-++-shifts-var : ∀{A : Set} (ρ₁ ρ₂ ρ₃ : List A) (x : Id)
+  → nth (ρ₁ ++ (ρ₂ ++ ρ₃)) (shifts-var x (length ρ₁) (length ρ₂))
+    ≡ nth (ρ₁ ++ ρ₃) x
+nth-++-shifts-var ρ₁ ρ₂ ρ₃ x
+    with (length ρ₁) ≤ᵇ x in lt
+... | true
+    with m≤n⇒-+ (length ρ₁) x (≤ᵇ⇒≤ (length ρ₁) x (eq-true-top lt))
+... | i , refl
+    rewrite sym (+-assoc (length ρ₂) (length ρ₁) i)
+    | +-comm (length ρ₂) (length ρ₁)
+    | +-assoc (length ρ₁) (length ρ₂) i
+    | nth-++-+ ρ₁ (ρ₂ ++ ρ₃) (length ρ₂ + i)
+    | nth-++-+ ρ₂ ρ₃ i
+    | nth-++-+ ρ₁ ρ₃ i
+    = refl
+nth-++-shifts-var ρ₁ ρ₂ ρ₃ x
+    | false
+    rewrite nth-++-< ρ₁ (ρ₂ ++ ρ₃) x (≰⇒> λ x₁ → (eq-false-not-top lt) (≤⇒≤ᵇ x₁))
+    | nth-++-< ρ₁ ρ₃ x (≰⇒> λ x₁ → (eq-false-not-top lt) (≤⇒≤ᵇ x₁))
+    = refl
+
+update-++-< : ∀{A : Set} → (xs ys : List A) (n : ℕ) (v : A)
+       → n < length xs
+       → update (xs ++ ys) n v ≡ update xs n v ++ ys
+update-++-< {A} (x₁ ∷ xs) ys zero v lt = refl
+update-++-< {A} (x₁ ∷ xs) ys (suc x) v (_≤_.s≤s lt)
+  rewrite update-++-< xs ys x v lt = refl
+
+update-++-+ : ∀{A : Set} → (xs ys : List A) (n : ℕ) (v : A)
+  → update (xs ++ ys) (length xs + n) v ≡ xs ++ update ys n v
+update-++-+ [] ys n v = refl
+update-++-+ (x ∷ xs) ys n v = cong (x ∷_) (update-++-+ xs ys n v)
+
+update-+ : ∀{A : Set} (xs : List A) (i : ℕ) (v : A)
+    → update xs (length xs + i) v ≡ xs
+update-+ [] i v = refl
+update-+ (x ∷ xs) i v = cong (x ∷_) (update-+ xs i v)
+
+cons-++ : ∀ {A : Set}(x : A)(xs ys zs : List A)
+  → x ∷ xs ≡ zs
+  → x ∷ xs ++ ys ≡ zs ++ ys
+cons-++ x xs ys zs refl = refl
 
 postulate
   extensionality : ∀ {A B : Set} {f g : A → B}

@@ -1,10 +1,10 @@
 module LIf where
 
 open import Agda.Builtin.Unit
-open import Data.Nat using (ℕ; zero; suc; _<_)
+open import Data.Nat using (ℕ; zero; suc; _<_; _+_)
 open import Data.Nat.Properties
 open import Data.Product
-open import Data.Integer using (ℤ; -_; _-_; 0ℤ; _≤ᵇ_)
+open import Data.Integer using (ℤ; -_; _-_; 0ℤ; 1ℤ; -1ℤ; _≤ᵇ_)
 open import Data.List
 open import Data.Maybe
 open import Relation.Binary.PropositionalEquality
@@ -170,6 +170,144 @@ rco (Var i) = Atom (Var i)
 rco (Let e₁ e₂) = Let (rco e₁) (rco e₂)
 rco (If e₁ e₂ e₃) = If (rco e₁) (rco e₂) (rco e₃)
 
+
+----------------- Definition of IL1If ----------------------------
+
+data IL1-Exp : Set where
+  Atom : Atm → IL1-Exp
+  Read : IL1-Exp
+  Uni : UniOp → Atm → IL1-Exp
+  Bin : BinOp → Atm → Atm → IL1-Exp
+  Assign : Id → IL1-Exp → IL1-Exp → IL1-Exp
+  If : IL1-Exp → IL1-Exp → IL1-Exp → IL1-Exp
+
+data IL1-Prog : Set where
+  Program : ℕ → IL1-Exp → IL1-Prog
+
+interp-il1-exp : IL1-Exp → Env Value → Reader Value
+interp-il1-exp (Atom atm) ρ = try (interp-atm atm ρ)
+interp-il1-exp Read ρ = read-int Int
+interp-il1-exp (Uni op a) ρ =
+  try (interp-atm a ρ) then
+  λ v → uniop op v
+interp-il1-exp (Bin op a₁ a₂) ρ =
+  try (interp-atm a₁ ρ) then
+  λ v₁ → try (interp-atm a₂ ρ) then
+  λ v₂ → binop op v₁ v₂
+interp-il1-exp (Assign x e₁ e₂) ρ =
+  (interp-il1-exp e₁ ρ) then
+  λ v₁ → interp-il1-exp e₂ (update ρ x v₁)
+interp-il1-exp (If e₁ e₂ e₃) ρ =
+  (interp-il1-exp e₁ ρ) then
+  λ v₁ → try (toBool v₁) then
+  λ { true → interp-il1-exp e₂ ρ
+    ; false → interp-il1-exp e₃ ρ }
+
+interp-IL1 : IL1-Prog → Inputs → Maybe Value
+interp-IL1 (Program n e) s =
+    run (interp-il1-exp e (replicate n (Int 0ℤ))) s
+
+----------------- Convert to IL1: Lift Locals -------------------
+
+shifts-atm : Atm → ℕ → ℕ → Atm
+shifts-atm (Num x) c n = Num x
+shifts-atm (Bool b) c n = Bool b
+shifts-atm (Var x) c n = Var (shifts-var x c n)
+
+shifts-il1-exp : IL1-Exp → ℕ → ℕ → IL1-Exp
+shifts-il1-exp (Atom a) c n =
+    Atom (shifts-atm a c n) 
+shifts-il1-exp Read c n =
+    Read
+shifts-il1-exp (Uni op a) c n =
+    Uni op (shifts-atm a c n)
+shifts-il1-exp (Bin op a₁ a₂) c n =
+    Bin op (shifts-atm a₁ c n) (shifts-atm a₂ c n)
+shifts-il1-exp (Assign x e₁ e₂) c n =
+    Assign (shifts-var x c n) (shifts-il1-exp e₁ c n) (shifts-il1-exp e₂ c n)
+shifts-il1-exp (If e₁ e₂ e₃) c n =
+    If (shifts-il1-exp e₁ c n) (shifts-il1-exp e₂ c n) (shifts-il1-exp e₃ c n)
+
+-- Hoists all the Let's to the top, leaving in their place assignments.
+--   let x = e₁ in e₂
+--   ==>
+--   let x = 0 in { x := e′₁; e′₂ }
+--
+--
+--   Returns the number of let's around the expression:
+--   let y₁=0,...,yᵢ=0 in m₁
+--   is represented as
+--   i , m₁
+lift-locals-mon : Mon → ℕ × IL1-Exp
+lift-locals-mon (Atom a) = 0 , (Atom a)
+lift-locals-mon Read = 0 , Read
+lift-locals-mon (Uni op a) = 0 , (Uni op a)
+lift-locals-mon (Bin op a₁ a₂) = 0 , (Bin op a₁ a₂)
+
+lift-locals-mon (Let m₁ m₂)
+    with lift-locals-mon m₁
+... | i , e₁
+    with lift-locals-mon m₂
+... | j , e₂
+--   let x = (let y₁=0,...,yᵢ=0 in m₁)
+--   in (let z₁=0,...,zⱼ=0 in m₂)
+--   ==>
+--   let x=0, y₁=0,...,yᵢ=0, z₁=0,...,zⱼ=0  in
+--   i+j := (e₁ ↑ j+1 cutoff 0);
+--   (e₂ ↑ i cutoff j)
+    = (suc (i + j)) , Assign (i + j) (shifts-il1-exp e₁ 0 (suc j)) (shifts-il1-exp e₂ j i)
+    
+lift-locals-mon (If m₁ m₂ m₃) 
+    with lift-locals-mon m₁ 
+... | i , e₁
+    with lift-locals-mon m₂ 
+... | j , e₂
+    with lift-locals-mon m₃ 
+... | k , e₃
+--  if (let x₁=0,...,xᵢ=0 in m₁) then
+--      (let y₁=0,...,yⱼ=0 in m₂)
+--  else 
+--      (let z₁=0,...,z_k=0 in m₃)
+--  ==>
+--  let x₁=0,...,xᵢ=0, y₁=0,...,yⱼ=0, z₁=0,...,z_k=0 in
+--  if (m₁ ↑ j + k cutoff 0) then ((m₂ ↑ k cutoff 0) ↑ i cutoff (k + j)) else (m₃ ↑ i + j cutoff k)
+    =
+    let e′₁ = shifts-il1-exp e₁ (j + k) 0 in
+    let e′₂ = shifts-il1-exp (shifts-il1-exp e₂ k 0) i (k + j) in
+    let e′₃ = shifts-il1-exp e₃ (i + j) k in
+    (i + j + k) , (If e′₁ e′₂ e′₃)
+
+lift-locals : Mon → IL1-Prog
+lift-locals m
+    with lift-locals-mon m
+... | n , e = Program n e    
+
+---- Test lift-locals
+
+S0 : Inputs
+S0 = (1 , λ x → Data.Integer.+ x)
+
+test : Mon → Set
+test P = interp-IL1 (lift-locals P) S0 ≡ run (interp-mon P []) S0
+
+P0 : Mon
+P0 = Let Read (Atom (Var 0))
+T0 : test P0
+T0 = refl
+
+P1 : Mon
+P1 = Let Read (Let Read (Bin Sub (Var 0) (Var 1)))
+T1 : test P1
+T1 = refl
+
+P2 : Mon
+P2 = Let Read
+      (Let (Let (Bin Sub (Var 0) (Num 1ℤ)) (Bin Sub (Var 0) (Num -1ℤ)))
+       (Let (Uni Neg (Var 0))
+        (Bin Sub (Var 2) (Var 0))))
+T2 : test P2
+T2 = refl
+      
 ----------------- Definition of CIf ----------------------------
 
 data CExp : Set where
@@ -235,45 +373,37 @@ interp-CIf n B s = run (try (last B) then
 --- Big-step Semantics for CIf
 
 infix 4 _,_,_⊢_⇓_
-data _,_,_⊢_⇓_ : Env Value → Inputs → Blocks → CTail → Maybe (Value × Inputs) → Set where
+data _,_,_⊢_⇓_ : Env Value → Inputs → Blocks → CTail → (Value × Inputs) → Set where
    return-⇓ : ∀{ρ}{s}{B}{e}{r}
-       → interp-CExp e ρ s ≡ r
+       → interp-CExp e ρ s ≡ just r
        → ρ , s , B ⊢ Return e ⇓ r
-   let-⇓ : ∀{ρ}{B}{e}{t}{s0 s1 : Inputs}{v}{r : Maybe (Value × Inputs)}
+   let-⇓ : ∀{ρ}{B}{e}{t}{s0 s1 : Inputs}{v}{r : (Value × Inputs)}
        → interp-CExp e ρ s0 ≡ just (v , s1)
        → v ∷ ρ , s1 , B ⊢ t ⇓ r
        → ρ , s0 , B ⊢ Let e t ⇓ r
-   if-⇓-true : ∀{ρ}{B}{op}{a₁ a₂ : Atm}{thn}{els}{s0 s1 : Inputs}{t-thn : CTail }{r : Maybe (Value × Inputs)}
+   if-⇓-true : ∀{ρ}{B}{op}{a₁ a₂ : Atm}{thn}{els}{s0 s1 : Inputs}{t-thn : CTail }{r : (Value × Inputs)}
        → interp-CExp (Bin op a₁ a₂) ρ s0 ≡ just (Bool true , s1)
        → nth B thn ≡ just t-thn
        → ρ , s1 , B ⊢ t-thn ⇓ r
        → ρ , s0 , B ⊢ If op a₁ a₂ thn els ⇓ r
-   if-⇓-false : ∀{ρ}{B}{op}{a₁ a₂ : Atm}{thn}{els}{s0 s1 : Inputs}{t-els : CTail }{r : Maybe (Value × Inputs)}
+   if-⇓-false : ∀{ρ}{B}{op}{a₁ a₂ : Atm}{thn}{els}{s0 s1 : Inputs}{t-els : CTail }{r : (Value × Inputs)}
        → interp-CExp (Bin op a₁ a₂) ρ s0 ≡ just (Bool true , s1)
        → nth B els ≡ just t-els
        → ρ , s1 , B ⊢ t-els ⇓ r
        → ρ , s0 , B ⊢ If op a₁ a₂ thn els ⇓ r
-   goto-⇓ : ∀{ρ}{B}{s0 : Inputs}{lbl}{t : CTail}{r : Maybe (Value × Inputs)}
+   goto-⇓ : ∀{ρ}{B}{s0 : Inputs}{lbl}{t : CTail}{r : (Value × Inputs)}
        → nth B lbl ≡ just t
        → ρ , s0 , B ⊢ t ⇓ r
        → ρ , s0 , B ⊢ Goto lbl ⇓ r
 
---- Variable Shifting for CIf
-
-shift-exp : CExp → ℕ → CExp
-shift-exp (Atom atm) c = Atom (shift-atm atm c)
-shift-exp Read c = Read
-shift-exp (Uni op a) c = Uni op (shift-atm a c)
-shift-exp (Bin op a₁ a₂) c = Bin op (shift-atm a₁ c) (shift-atm a₂ c)
-
-shift-tail : CTail → ℕ → CTail
-shift-tail (Return e) c = Return (shift-exp e c)
-shift-tail (Let e t) c = Let (shift-exp e c) (shift-tail t (suc c))
-shift-tail (If op a₁ a₂ thn els) c =
-  If op (shift-atm a₁ c) (shift-atm a₂ c) thn els
-shift-tail (Goto lbl) c = Goto lbl
+eval-CIf : Blocks → Inputs → Value → Set
+eval-CIf B s v = Σ[ s' ∈ Inputs ] Σ[ t ∈ CTail ] (last B ≡ just t × [] , s , B ⊢ t ⇓ (v , s'))
 
 ----------------- Explicate Control ----------------------------
+
+-- Split into two parts:
+-- A) Move the Let's to the top
+-- B) Convert AST to a DAG
 
 -- Block Monad
 -- Next label to use for a new block
@@ -294,22 +424,22 @@ create-block : CTail → Blocker Id
 create-block (Goto lbl) B = lbl , B
 create-block t B = length B , (B ++ [ t ])
 
-explicate-let : Mon → CTail → Blocker CTail
-explicate-pred : Mon → CTail → CTail → Blocker CTail
-explicate-tail : Mon → Blocker CTail
+explicate-assign : IL1-Exp → CTail → Blocker CTail
+explicate-pred : IL1-Exp → CTail → CTail → Blocker CTail
+explicate-tail : IL1-Exp → Blocker CTail
 
-explicate-let (Atom a) rest = returnB (Let (Atom a) rest  )
-explicate-let Read rest = returnB (Let Read rest)
-explicate-let (Uni op a) rest = returnB (Let (Uni op a) rest)
-explicate-let (Bin op a₁ a₂) rest = returnB (Let (Bin op a₁ a₂) rest)
-explicate-let (Let m₁ m₂) rest =
-  explicate-let m₂ (shift-tail rest 1) thenB
-  λ t₂ → explicate-let m₁ t₂
-explicate-let (If m₁ m₂ m₃) rest =
+explicate-assign (Atom a) rest = returnB (Let (Atom a) rest  )
+explicate-assign Read rest = returnB (Let Read rest)
+explicate-assign (Uni op a) rest = returnB (Let (Uni op a) rest)
+explicate-assign (Bin op a₁ a₂) rest = returnB (Let (Bin op a₁ a₂) rest)
+explicate-assign (Assign x e₁ e₂) rest =
+  explicate-assign e₂ rest thenB
+  λ t₂ → explicate-assign e₁ t₂
+explicate-assign (If e₁ e₂ e₃) rest =
    create-block rest thenB
-   λ l → explicate-let m₂ (Goto l) thenB
-   λ t₂ → explicate-let m₃ (Goto l) thenB
-   λ t₃ → explicate-pred m₁ t₂ t₃
+   λ l → explicate-assign e₂ (Goto l) thenB
+   λ t₂ → explicate-assign e₃ (Goto l) thenB
+   λ t₃ → explicate-pred e₁ t₂ t₃
 
 explicate-pred (Atom a) thn els =
   create-block thn thenB
@@ -322,31 +452,31 @@ explicate-pred (Bin op a₁ a₂) thn els =
   create-block thn thenB
   λ lbl-thn → create-block els thenB
   λ lbl-els → returnB (If op a₁ a₂ lbl-thn lbl-els)
-explicate-pred (Let m₁ m₂) thn els =
-  explicate-pred m₂ (shift-tail thn 1) (shift-tail els 1) thenB
-  λ rest' → explicate-let m₁ rest'
-explicate-pred (If m₁ m₂ m₃) thn els =
+explicate-pred (Assign x e₁ e₂) thn els =
+  explicate-pred e₂ thn els thenB
+  λ rest' → explicate-assign e₁ rest'
+explicate-pred (If e₁ e₂ e₃) thn els =
     create-block thn thenB
    λ lbl-thn → create-block els thenB
-   λ lbl-els → explicate-pred m₂ (Goto lbl-thn) (Goto lbl-els) thenB
-   λ t₂ → (explicate-pred m₃ (Goto lbl-thn) (Goto lbl-els)) thenB
-   λ t₃ → explicate-pred m₁ t₂ t₃
+   λ lbl-els → explicate-pred e₂ (Goto lbl-thn) (Goto lbl-els) thenB
+   λ t₂ → (explicate-pred e₃ (Goto lbl-thn) (Goto lbl-els)) thenB
+   λ t₃ → explicate-pred e₁ t₂ t₃
 
 explicate-tail (Atom a) = returnB (Return (Atom a))
 explicate-tail Read = returnB (Return Read)
 explicate-tail (Uni op a) = returnB (Return (Uni op a))
 explicate-tail (Bin op a₁ a₂) = returnB (Return (Bin op a₁ a₂))
-explicate-tail (Let m₁ m₂) =
-  explicate-tail m₂ thenB
-  λ t₂ → explicate-let m₁ t₂
-explicate-tail (If m₁ m₂ m₃) =
-  (explicate-tail m₂) thenB
-  λ t₂ → (explicate-tail m₃) thenB
-  λ t₃ → explicate-pred m₁ t₂ t₃
+explicate-tail (Assign x e₁ e₂) =
+  explicate-tail e₂ thenB
+  λ t₂ → explicate-assign e₁ t₂
+explicate-tail (If e₁ e₂ e₃) =
+  (explicate-tail e₂) thenB
+  λ t₂ → (explicate-tail e₃) thenB
+  λ t₃ → explicate-pred e₁ t₂ t₃
 
-explicate : Mon → Blocks
-explicate m = proj₂ (((explicate-tail m) thenB
-                      (λ t → create-block t)) [])
+-- explicate : IL1-Prog → Blocks
+-- explicate m = proj₂ (((explicate-tail m) thenB
+--                     (λ t → create-block t)) [])
 
 
 
