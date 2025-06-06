@@ -56,15 +56,25 @@ uniop Not v =
   try (toBool v) then
   (λ n → return (Bool (not n)))
 
+_≡ᵇ_ : 𝔹 → 𝔹 → 𝔹
+false ≡ᵇ false = true
+false ≡ᵇ true = false
+true ≡ᵇ false = false
+true ≡ᵇ true = true
+
 binop : BinOp → Value → Value → Reader Value
 binop Sub v₁ v₂ =
   try (toInt v₁) then
   λ n₁ → try (toInt v₂) then
   λ n₂ → return (Int (n₁ - n₂))
-binop Eq v₁ v₂ =
-  try (toInt v₁) then
-  λ n₁ → try (toInt v₂) then
-  λ n₂ → return (Bool ((n₁ ≤ᵇ n₂) ∧ (n₂ ≤ᵇ n₁)))
+binop Eq (Int n) (Int n′) = return (Bool (n ≤ᵇ n′))
+binop Eq (Int n) (Bool b) = return (Bool false)
+binop Eq (Bool b) (Int n) = return (Bool false)
+binop Eq (Bool b) (Bool b′) = return (Bool (b ≡ᵇ b′))
+
+  -- try (toInt v₁) then
+  -- λ n₁ → try (toInt v₂) then
+  -- λ n₂ → return (Bool ((n₁ ≤ᵇ n₂) ∧ (n₂ ≤ᵇ n₁)))
 binop LessEq v₁ v₂ =
   try (toInt v₁) then
   λ n₁ → try (toInt v₂) then
@@ -372,15 +382,13 @@ data _,_,_⊢_⇓_ : Env Value → Inputs → Blocks → CTail → (Value × Inp
        → interp-CExp e ρ s0 ≡ just (v , s1)
        → update ρ x v , s1 , B ⊢ t ⇓ r
        → ρ , s0 , B ⊢ Assign x e t ⇓ r
-   if-⇓-true : ∀{ρ}{B}{op}{a₁ a₂ : Atm}{thn}{els}{s0 s1 : Inputs}{t-thn : CTail }{r : (Value × Inputs)}
+   if-⇓-true : ∀{ρ}{B}{op}{a₁ a₂ : Atm}{thn}{els}{s0 s1 : Inputs}{r : (Value × Inputs)}
        → interp-CExp (Bin op a₁ a₂) ρ s0 ≡ just (Bool true , s1)
-       → nth B thn ≡ just t-thn
-       → ρ , s1 , B ⊢ t-thn ⇓ r
+       → ρ , s1 , B ⊢ Goto thn ⇓ r
        → ρ , s0 , B ⊢ If op a₁ a₂ thn els ⇓ r
-   if-⇓-false : ∀{ρ}{B}{op}{a₁ a₂ : Atm}{thn}{els}{s0 s1 : Inputs}{t-els : CTail }{r : (Value × Inputs)}
-       → interp-CExp (Bin op a₁ a₂) ρ s0 ≡ just (Bool true , s1)
-       → nth B els ≡ just t-els
-       → ρ , s1 , B ⊢ t-els ⇓ r
+   if-⇓-false : ∀{ρ}{B}{op}{a₁ a₂ : Atm}{thn}{els}{s0 s1 : Inputs}{r : (Value × Inputs)}
+       → interp-CExp (Bin op a₁ a₂) ρ s0 ≡ just (Bool false , s1)
+       → ρ , s1 , B ⊢ Goto els ⇓ r
        → ρ , s0 , B ⊢ If op a₁ a₂ thn els ⇓ r
    goto-⇓ : ∀{ρ}{B}{s0 : Inputs}{lbl}{t : CTail}{r : (Value × Inputs)}
        → nth B lbl ≡ just t
@@ -413,7 +421,6 @@ _thenB_ : ∀{A B : Set} → Blocker A → (A → Blocker B) → Blocker B
 ... | (v , s') = g v s'
 
 create-block : CTail → Blocker Id
-create-block (Goto lbl) B = lbl , B
 create-block t B = length B , (B ++ [ t ])
 
 explicate-assign : Id → IL1-Exp → CTail → Blocker CTail
