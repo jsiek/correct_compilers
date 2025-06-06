@@ -482,27 +482,6 @@ eval-tail-blocks (If op a₁ a₂ thn els) ρ B₁ B₂ s s' v B12 (if-⇓-false
 eval-tail-blocks (Goto l) ρ B₁ B₂ s s' v B12 (goto-⇓ nth t⇓) =
   goto-⇓ (nth-blocks B12 nth) (eval-tail-blocks _ ρ B₁ B₂ s s' v B12 t⇓)
 
-explicate-assign-correct : ∀(y : Id)(e : IL1-Exp) (t t' : CTail) (ρ : Env Value)
-   (B₂ B₃ : Blocks) (s s1 : Inputs) (v : Value) (r : Value × Inputs)
-  → explicate-assign y e t B₂ ≡ (t' , B₃)
-  → interp-il1-exp e ρ s ≡ just (v , s1)
-  → (update ρ y v) , s1 , B₃ ⊢ t ⇓ r
-  → ρ , s , B₃ ⊢ t' ⇓ r
-explicate-assign-correct y e t t' ρ B₂ B₃ s ea ie t⇓ = {!!}
-
-explicate-tail-correct : ∀ (e : IL1-Exp) (ρ : Env Value) (B B' : Blocks) (t : CTail) (s : Inputs) (r : Value × Inputs)
-  → explicate-tail e B ≡ (t , B')
-  → interp-il1-exp e ρ s ≡ just r
-  →  ρ , s , B' ⊢ t ⇓ r
-explicate-tail-correct e ρ B B' t s et ie = {!!}
-
-explicate-pred-correct : ∀ (e₁ : IL1-Exp) (t₁ t₂ t₃ : CTail) (ρ : Env Value) (B₄ B₅ : Blocks) (s s1 : Inputs) (r : Value × Inputs) (b : 𝔹)
-  → explicate-pred e₁ t₂ t₃ B₄ ≡ (t₁ , B₅)
-  → interp-il1-exp e₁ ρ s ≡ just (Value.Bool b , s1)
-  → ρ , s1 , B₅ ⊢ (if b then t₂ else t₃) ⇓ r
-  → ρ , s , B₅ ⊢ t₁ ⇓ r
-explicate-pred-correct e₁ t₂ t₃ ρ B₄ B₅ s ep = {!!}
-
 create-block-correct : ∀ (t : CTail) (B B' : Blocks) (lbl : Id)
     (ρ : Env Value) (s : Inputs) (r : Value × Inputs)
   → create-block t B ≡ (lbl , B')
@@ -524,6 +503,27 @@ create-block-correct (If op a₁ a₂ e₁ e₂) B B' lbl ρ s r refl t⇓ =
   where
   t = If op a₁ a₂ e₁ e₂
 create-block-correct (Goto lbl) B B lbl ρ s r refl t⇓ = t⇓
+
+explicate-assign-correct : ∀(y : Id)(e : IL1-Exp) (t t' : CTail) (ρ : Env Value)
+   (B₂ B₃ : Blocks) (s s1 : Inputs) (v : Value) (r : Value × Inputs)
+  → explicate-assign y e t B₂ ≡ (t' , B₃)
+  → interp-il1-exp e ρ s ≡ just (v , s1)
+  → (update ρ y v) , s1 , B₃ ⊢ t ⇓ r
+  → ρ , s , B₃ ⊢ t' ⇓ r
+explicate-assign-correct y e t t' ρ B₂ B₃ s ea ie t⇓ = {!!}
+
+explicate-tail-correct : ∀ (e : IL1-Exp) (ρ : Env Value) (B B' : Blocks) (t : CTail) (s : Inputs) (r : Value × Inputs)
+  → explicate-tail e B ≡ (t , B')
+  → interp-il1-exp e ρ s ≡ just r
+  →  ρ , s , B' ⊢ t ⇓ r
+explicate-tail-correct e ρ B B' t s et ie = {!!}
+
+explicate-pred-correct : ∀ (e₁ : IL1-Exp) (t₁ t₂ t₃ : CTail) (ρ : Env Value) (B₄ B₅ : Blocks) (s s1 : Inputs) (r : Value × Inputs) (b : 𝔹)
+  → explicate-pred e₁ t₂ t₃ B₄ ≡ (t₁ , B₅)
+  → interp-il1-exp e₁ ρ s ≡ just (Value.Bool b , s1)
+  → ρ , s1 , B₅ ⊢ (if b then t₂ else t₃) ⇓ r
+  → ρ , s , B₅ ⊢ t₁ ⇓ r
+explicate-pred-correct e₁ t₂ t₃ ρ B₄ B₅ s ep = {!!}
 
 explicate-correct : ∀ (p : IL1-Prog) (s : Inputs) (v : Value)
   → interp-IL1 p s ≡ just v
