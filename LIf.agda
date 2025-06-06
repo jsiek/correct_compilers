@@ -334,7 +334,7 @@ data CExp : Set where
 
 data CTail : Set where
   Return : CExp → CTail
-  Let : CExp → CTail → CTail
+  Assign : Id → CExp → CTail → CTail
   If : BinOp → Atm → Atm → Id → Id → CTail
   Goto : Id → CTail
 
@@ -346,7 +346,7 @@ data Type : Set where
   BoolT : Type
 
 data C-Prog : Set where
-  Program : ℕ → Blocks → C-Prog
+  Program : ℕ → Id → Blocks → C-Prog
 
 --- Interpreter for CIf
 
@@ -361,31 +361,6 @@ interp-CExp (Bin op a₁ a₂) ρ =
   λ v₁ → try (interp-atm a₂ ρ) then
   λ v₂ → binop op v₁ v₂
 
-interp-tail : ℕ → CTail → Env Value → Blocks → Reader Value
-interp-tail 0 e ρ B = timeout
-interp-tail (suc n) (Return e) ρ B = interp-CExp e ρ
-interp-tail (suc n) (Let e t) ρ B =
-  (interp-CExp e ρ) then
-  λ v₁ → interp-tail n t (v₁ ∷ ρ) B
-interp-tail (suc n) (If op a₁ a₂ thn els) ρ B =
-  try (interp-atm a₁ ρ) then
-  λ v₁ → try (interp-atm a₂ ρ) then
-  λ v₂ → binop op v₁ v₂ then
-  λ v₃ → try (toBool v₃) then
-  λ { true →
-        try (nth B thn) then
-        λ t → interp-tail n t ρ B
-    ; false →
-        try (nth B els) then
-        λ t → interp-tail n t ρ B }
-interp-tail (suc n) (Goto lbl) ρ B =
-     try (nth B lbl) then
-     λ t → interp-tail n t ρ B
-  
-interp-CIf : ℕ → Blocks → Inputs → Maybe Value
-interp-CIf n B s = run (try (last B) then
-                        λ t → interp-tail n t [] B) s
-
 --- Big-step Semantics for CIf
 
 infix 4 _,_,_⊢_⇓_
@@ -393,10 +368,10 @@ data _,_,_⊢_⇓_ : Env Value → Inputs → Blocks → CTail → (Value × Inp
    return-⇓ : ∀{ρ}{s}{B}{e}{r}
        → interp-CExp e ρ s ≡ just r
        → ρ , s , B ⊢ Return e ⇓ r
-   let-⇓ : ∀{ρ}{B}{e}{t}{s0 s1 : Inputs}{v}{r : (Value × Inputs)}
+   assign-⇓ : ∀{ρ}{B}{x}{e}{t}{s0 s1 : Inputs}{v}{r : (Value × Inputs)}
        → interp-CExp e ρ s0 ≡ just (v , s1)
-       → v ∷ ρ , s1 , B ⊢ t ⇓ r
-       → ρ , s0 , B ⊢ Let e t ⇓ r
+       → update ρ x v , s1 , B ⊢ t ⇓ r
+       → ρ , s0 , B ⊢ Assign x e t ⇓ r
    if-⇓-true : ∀{ρ}{B}{op}{a₁ a₂ : Atm}{thn}{els}{s0 s1 : Inputs}{t-thn : CTail }{r : (Value × Inputs)}
        → interp-CExp (Bin op a₁ a₂) ρ s0 ≡ just (Bool true , s1)
        → nth B thn ≡ just t-thn
@@ -412,8 +387,9 @@ data _,_,_⊢_⇓_ : Env Value → Inputs → Blocks → CTail → (Value × Inp
        → ρ , s0 , B ⊢ t ⇓ r
        → ρ , s0 , B ⊢ Goto lbl ⇓ r
 
-eval-CIf : Blocks → Inputs → Value → Set
-eval-CIf B s v = Σ[ s' ∈ Inputs ] Σ[ t ∈ CTail ] (last B ≡ just t × [] , s , B ⊢ t ⇓ (v , s'))
+eval-CIf : C-Prog → Inputs → Value → Set
+eval-CIf (Program n lbl B) s v =
+    Σ[ s' ∈ Inputs ] (replicate n (Int 0ℤ)) , s , B ⊢ Goto lbl ⇓ (v , s')
 
 ----------------- Explicate Control ----------------------------
 
@@ -440,21 +416,21 @@ create-block : CTail → Blocker Id
 create-block (Goto lbl) B = lbl , B
 create-block t B = length B , (B ++ [ t ])
 
-explicate-assign : IL1-Exp → CTail → Blocker CTail
+explicate-assign : Id → IL1-Exp → CTail → Blocker CTail
 explicate-pred : IL1-Exp → CTail → CTail → Blocker CTail
 explicate-tail : IL1-Exp → Blocker CTail
 
-explicate-assign (Atom a) rest = returnB (Let (Atom a) rest  )
-explicate-assign Read rest = returnB (Let Read rest)
-explicate-assign (Uni op a) rest = returnB (Let (Uni op a) rest)
-explicate-assign (Bin op a₁ a₂) rest = returnB (Let (Bin op a₁ a₂) rest)
-explicate-assign (Assign x e₁ e₂) rest =
-  explicate-assign e₂ rest thenB
-  λ t₂ → explicate-assign e₁ t₂
-explicate-assign (If e₁ e₂ e₃) rest =
+explicate-assign y (Atom a) rest = returnB (Assign y (Atom a) rest)
+explicate-assign y Read rest = returnB (Assign y Read rest)
+explicate-assign y (Uni op a) rest = returnB (Assign y (Uni op a) rest)
+explicate-assign y (Bin op a₁ a₂) rest = returnB (Assign y (Bin op a₁ a₂) rest)
+explicate-assign y (Assign x e₁ e₂) rest =
+  explicate-assign y e₂ rest thenB
+  λ t₂ → explicate-assign x e₁ t₂
+explicate-assign y (If e₁ e₂ e₃) rest =
    create-block rest thenB
-   λ l → explicate-assign e₂ (Goto l) thenB
-   λ t₂ → explicate-assign e₃ (Goto l) thenB
+   λ l → explicate-assign y e₂ (Goto l) thenB
+   λ t₂ → explicate-assign y e₃ (Goto l) thenB
    λ t₃ → explicate-pred e₁ t₂ t₃
 
 explicate-pred (Atom a) thn els =
@@ -470,7 +446,7 @@ explicate-pred (Bin op a₁ a₂) thn els =
   λ lbl-els → returnB (If op a₁ a₂ lbl-thn lbl-els)
 explicate-pred (Assign x e₁ e₂) thn els =
   explicate-pred e₂ thn els thenB
-  λ rest' → explicate-assign e₁ rest'
+  λ rest' → explicate-assign x e₁ rest'
 explicate-pred (If e₁ e₂ e₃) thn els =
     create-block thn thenB
    λ lbl-thn → create-block els thenB
@@ -484,16 +460,15 @@ explicate-tail (Uni op a) = returnB (Return (Uni op a))
 explicate-tail (Bin op a₁ a₂) = returnB (Return (Bin op a₁ a₂))
 explicate-tail (Assign x e₁ e₂) =
   explicate-tail e₂ thenB
-  λ t₂ → explicate-assign e₁ t₂
+  λ t₂ → explicate-assign x e₁ t₂
 explicate-tail (If e₁ e₂ e₃) =
   (explicate-tail e₂) thenB
   λ t₂ → (explicate-tail e₃) thenB
   λ t₃ → explicate-pred e₁ t₂ t₃
 
 explicate : IL1-Prog → C-Prog
-explicate (Program n e) = Program n (proj₂ (((explicate-tail e) thenB
-                                            (λ t → create-block t)) []))
-
-
-
-      
+explicate (Program n e)
+    with ((explicate-tail e) thenB
+          (λ t → create-block t)) []
+... | lbl , B = Program n lbl B
+     

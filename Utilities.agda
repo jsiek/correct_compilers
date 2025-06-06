@@ -94,6 +94,12 @@ nth-++-+ : ∀{A : Set} → (xs ys : List A) (n : ℕ)
 nth-++-+ {A} [] ys n = refl
 nth-++-+ {A} (x ∷ xs) ys n = nth-++-+ xs ys n
 
+nth-++-1 : ∀ {A : Set} (B : List A) (t : A)
+  → nth (B ++ [ t ]) (length B) ≡ just t
+nth-++-1 B t rewrite sym (+-identityʳ (length B))
+    | nth-++-+ B [ t ] 0
+    = refl
+
 nth-++-just : ∀{A : Set} (xs ys : List A) (i : ℕ) (v : A)
   → nth xs i ≡ just v
   → nth (xs ++ ys) i ≡ just v

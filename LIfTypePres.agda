@@ -132,10 +132,11 @@ data _⊢ᵗ_ : TypeEnv → CTail → Set where
   wt-return : ∀ {Γ e }
     → Γ ⊢ᵉ e ⦂ IntT
     → Γ ⊢ᵗ Return e
-  wt-let : ∀ {Γ e t T₁}
+  wt-assign : ∀ {Γ x e t T₁}
+    → nth Γ x ≡ just T₁ 
     → Γ ⊢ᵉ e ⦂ T₁
     → (T₁ ∷ Γ) ⊢ᵗ t
-    → Γ ⊢ᵗ Let e t
+    → Γ ⊢ᵗ Assign x e t
   wt-if : ∀ {Γ op a₁ a₂ thn els T₁ T₂}
     → Γ ⊢ᵃ a₁ ⦂ T₁
     → Γ ⊢ᵃ a₂ ⦂ T₂
@@ -146,8 +147,8 @@ wt-blocks : TypeEnv → Blocks → Set
 wt-blocks Γ [] = ⊤
 wt-blocks Γ (b ∷ bs) = Γ ⊢ᵗ b × wt-blocks Γ bs
 
-wt-prog : CProgram → Set
-wt-prog (Γ , bs) = wt-blocks Γ bs
+-- wt-prog : CProgram → Set
+-- wt-prog (Γ , bs) = wt-blocks Γ bs
 
 
 --------------- Shift Preserves Types -------------------
