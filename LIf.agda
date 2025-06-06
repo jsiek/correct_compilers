@@ -324,13 +324,6 @@ P4 = Let Read
 T4 : test P4
 T4 = refl
 
--- Program 4
--- (Assign 3 Read
---  (If (Assign 2 Read (Bin LessEq (Var 2) (Num (ℤ.pos 1))))
---   (Assign 1 Read (Bin Sub (Var 1) (Var 3)))
---   (Assign 0 Read (Bin Sub (Var 3) (Var 0)))))
-
-
 ----------------- Definition of CIf ----------------------------
 
 data CExp : Set where
@@ -352,8 +345,8 @@ data Type : Set where
   IntT : Type
   BoolT : Type
 
-CProgram : Set
-CProgram = List Type × Blocks
+data C-Prog : Set where
+  Program : ℕ → Blocks → C-Prog
 
 --- Interpreter for CIf
 
@@ -497,9 +490,9 @@ explicate-tail (If e₁ e₂ e₃) =
   λ t₂ → (explicate-tail e₃) thenB
   λ t₃ → explicate-pred e₁ t₂ t₃
 
--- explicate : IL1-Prog → Blocks
--- explicate m = proj₂ (((explicate-tail m) thenB
---                     (λ t → create-block t)) [])
+explicate : IL1-Prog → C-Prog
+explicate (Program n e) = Program n (proj₂ (((explicate-tail e) thenB
+                                            (λ t → create-block t)) []))
 
 
 
