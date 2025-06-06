@@ -205,7 +205,7 @@ suc-i-j : ∀ (i j : ℕ)
 suc-i-j i j
   rewrite +-comm i j | +-comm j 1 = refl
 
--- ρ₁ is for what use to be bound variables in m, now initialized to 0
+-- ρ₁ is for the bound variables in m, which become free and are initialized to 0
 -- ρ₂ is for the free variables in m
 lift-mon-correct-aux : ∀ (m : Mon) (ρ₁ ρ₂ : Env Value)
   → proj₁ (lift-locals-mon m) ≡ length ρ₁
@@ -262,14 +262,66 @@ lift-mon-correct-aux (Let m₁ m₂) ρ₁ ρ₂ prem = extensionality Goal
     ... | just (v₂ , s2)
         = refl
 
-lift-mon-correct-aux (If m₁ m₂ m₃) ρ₁ ρ₂ prem = {!!}
-
+lift-mon-correct-aux (If m₁ m₂ m₃) ρ₁ ρ₂ prem = extensionality Goal
+    where
+    Goal : (s : Inputs)
+      → interp-mon (If m₁ m₂ m₃) ρ₂ s
+      ≡ interp-il1-exp (proj₂ (lift-locals-mon (If m₁ m₂ m₃))) (ρ₁ ++ ρ₂) s
+    Goal s
+        with lift-locals-mon m₁ in l1
+    ... | i , e₁
+        with lift-locals-mon m₂ in l2
+    ... | j , e₂
+        with lift-locals-mon m₃ in l3
+    ... | k , e₃
+        rewrite (+-assoc i j k) | +-comm i (j + k)
+        with ++-length ρ₁ (j + k) i (sym prem)
+    ... | ρ₁₁ , ρ₁₂ , refl , ρ₁₁≡j+k , refl
+        rewrite ++-assoc ρ₁₁ ρ₁₂ ρ₂ | sym ρ₁₁≡j+k
+        | interp-shifts-il1-exp e₁ [] ρ₁₁ (ρ₁₂ ++ ρ₂)
+        with lift-mon-correct-aux m₁ ρ₁₂ ρ₂
+    ... | IH1
+        rewrite l1 | sym (IH1 refl)
+        with interp-mon m₁ ρ₂ s
+    ... | nothing = refl
+    ... | just (Int n , s1) = refl
+    ... | just (Bool true , s1)
+        rewrite +-comm k j | sym ρ₁₁≡j+k
+        | interp-shifts-il1-exp (shifts-il1-exp e₂ 0 k) ρ₁₁ ρ₁₂ ρ₂
+        with ++-length ρ₁₁ k j
+    ... | split2
+        rewrite +-comm k j
+        with split2 ρ₁₁≡j+k
+    ... | ρ′₁₁ , ρ″₁₁ , eq11 , ρ′₁₁≡k , ρ″₁₁≡j
+        rewrite eq11 | ++-assoc ρ′₁₁ ρ″₁₁ ρ₂ | sym ρ′₁₁≡k
+        | interp-shifts-il1-exp e₂ [] ρ′₁₁ (ρ″₁₁ ++ ρ₂)
+        with lift-mon-correct-aux m₂ ρ″₁₁ ρ₂
+    ... | IH2
+        rewrite l2 | sym ρ″₁₁≡j | sym (IH2 refl)
+        = refl
+    Goal s | i , e₁ | j , e₂ | k , e₃ | ρ₁₁ , ρ₁₂ , refl , ρ₁₁≡j+k , refl | IH1
+        | just (Bool false , s1)
+        with ++-length ρ₁₁ k j
+    ... | split2
+        rewrite +-comm k j
+        with split2 ρ₁₁≡j+k
+    ... | ρ′₁₁ , ρ″₁₁ , eq11 , ρ′₁₁≡k , ρ″₁₁≡j
+        rewrite eq11 | ++-assoc ρ′₁₁ ρ″₁₁ (ρ₁₂ ++ ρ₂) | sym ρ″₁₁≡j | sym ρ′₁₁≡k
+        with interp-shifts-il1-exp e₃ ρ′₁₁ (ρ″₁₁ ++ ρ₁₂) ρ₂
+    ... | is3
+        rewrite ++-assoc ρ″₁₁ ρ₁₂ ρ₂ | length-++ ρ″₁₁ {ρ₁₂} | +-comm (length ρ₁₂) (length ρ″₁₁)
+        | is3
+        with lift-mon-correct-aux m₃ ρ′₁₁ ρ₂
+    ... | IH3
+        rewrite l3 | sym (IH3 refl)
+        = refl
 
 lift-mon-correct : ∀ (m : Mon) (ρ : Env Value)
   → proj₁ (lift-locals-mon m) ≡ length ρ
   → interp-mon m [] ≡ interp-il1-exp (proj₂ (lift-locals-mon m)) ρ
-lift-mon-correct m ρ prem = {!!}
-
+lift-mon-correct m ρ prem
+  rewrite lift-mon-correct-aux m ρ [] prem
+  | ++-identityʳ ρ = refl
 
 lift-locals-correct : ∀ (m : Mon) (s : Inputs)
   → interp-IL1 (lift-locals m) s ≡ interp-LMonIf m s

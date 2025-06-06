@@ -272,9 +272,9 @@ lift-locals-mon (If m₁ m₂ m₃)
 --  let x₁=0,...,xᵢ=0, y₁=0,...,yⱼ=0, z₁=0,...,z_k=0 in
 --  if (m₁ ↑ j + k cutoff 0) then ((m₂ ↑ k cutoff 0) ↑ i cutoff (k + j)) else (m₃ ↑ i + j cutoff k)
     =
-    let e′₁ = shifts-il1-exp e₁ (j + k) 0 in
-    let e′₂ = shifts-il1-exp (shifts-il1-exp e₂ k 0) i (k + j) in
-    let e′₃ = shifts-il1-exp e₃ (i + j) k in
+    let e′₁ = shifts-il1-exp e₁ 0 (j + k) in
+    let e′₂ = shifts-il1-exp (shifts-il1-exp e₂ 0 k) (k + j) i in
+    let e′₃ = shifts-il1-exp e₃ k (i + j) in
     (i + j + k) , (If e′₁ e′₂ e′₃)
 
 lift-locals : Mon → IL1-Prog
@@ -307,7 +307,30 @@ P2 = Let Read
         (Bin Sub (Var 2) (Var 0))))
 T2 : test P2
 T2 = refl
-      
+
+P3 : Mon
+P3 = Let Read
+      (If (Bin LessEq (Var 0) (Num 1ℤ))
+        (Let Read (Atom (Var 0)))
+        (Let Read (Atom (Num 0ℤ))))
+T3 : test P3
+T3 = refl
+
+P4 : Mon
+P4 = Let Read
+       (If (Let Read (Bin LessEq (Var 0) (Num 1ℤ)))
+           (Let Read (Bin Sub (Var 0) (Var 1)))
+           (Let Read (Bin Sub (Var 1) (Var 0))))
+T4 : test P4
+T4 = refl
+
+-- Program 4
+-- (Assign 3 Read
+--  (If (Assign 2 Read (Bin LessEq (Var 2) (Num (ℤ.pos 1))))
+--   (Assign 1 Read (Bin Sub (Var 1) (Var 3)))
+--   (Assign 0 Read (Bin Sub (Var 3) (Var 0)))))
+
+
 ----------------- Definition of CIf ----------------------------
 
 data CExp : Set where
