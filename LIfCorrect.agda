@@ -383,79 +383,56 @@ explicate-assign-blocks y (Atom a) t t' B₁ B₂ refl = [] , ++-identityʳ B₁
 explicate-assign-blocks y Read t t' B₁ B₂ refl = [] , (++-identityʳ B₁)
 explicate-assign-blocks y (Uni op a) t t' B₁ B₂ refl = [] , ++-identityʳ B₁
 explicate-assign-blocks y (Bin op a₁ a₂) t t' B₁ B₂ refl = [] , ++-identityʳ B₁
-explicate-assign-blocks y (Assign x m₁ m₂) t t' B₁ B₂ el1
-    with explicate-assign y m₂ t B₁ in el2
-... | (t₂ , B) =
-  let B₁↝B = explicate-assign-blocks y m₂ t t₂ B₁ B el2 in
-  let B↝B₂ = explicate-assign-blocks x m₁ t₂ t' B B₂ el1 in
-  ↝-trans B₁↝B B↝B₂ 
-explicate-assign-blocks y (If m₁ m₂ m₃) t t' B₁ B₂ el
-    with create-block t B₁ in cb1
-... | cont , B
-    with explicate-assign y m₂ (Goto cont) B in el2
-... | t₂ , B'
-    with explicate-assign y m₃ (Goto cont) B' in el3
-... | t₃ , B'' =
-    let B₁↝B = ↝-create-block t B₁ B cont cb1 in
-    let B↝B' = explicate-assign-blocks y m₂ (Goto cont) t₂ B B' el2 in
-    let B'↝B'' = explicate-assign-blocks y m₃ (Goto cont) t₃ B' B'' el3 in
-    let B''↝B₂ = explicate-pred-blocks m₁ t₂ t₃ t' B'' B₂ {!!} in
+explicate-assign-blocks y (Assign x m₁ m₂) t t' B₁ B₂ refl =
+    let (t₂ , B) = explicate-assign y m₂ t B₁ in 
+    let B₁↝B = explicate-assign-blocks y m₂ t t₂ B₁ B refl in
+    let B↝B₂ = explicate-assign-blocks x m₁ t₂ t' B B₂ refl in
+    ↝-trans B₁↝B B↝B₂ 
+explicate-assign-blocks y (If m₁ m₂ m₃) t t' B₁ B₂ el =
+    let (cont , B) = create-block t B₁ in
+    let (t₂ , B') = explicate-assign y m₂ (Goto cont) B in 
+    let (t₃ , B'') = explicate-assign y m₃ (Goto cont) B' in 
+    let B₁↝B = ↝-create-block t B₁ B cont refl in
+    let B↝B' = explicate-assign-blocks y m₂ (Goto cont) t₂ B B' refl in
+    let B'↝B'' = explicate-assign-blocks y m₃ (Goto cont) t₃ B' B'' refl in
+    let B''↝B₂ = explicate-pred-blocks m₁ t₂ t₃ t' B'' B₂ el in
     ↝-trans B₁↝B (↝-trans B↝B' (↝-trans B'↝B'' B''↝B₂))
 
-explicate-pred-blocks (Atom a) t₁ t₂ t B₁ B₂ ep
-    with create-block t₁ B₁ in cb1
-... | l1 , B
-    with create-block t₂ B in cb2
-... | l2 , B'
-    with ep
-... | refl =
-    let B₁↝B = ↝-create-block t₁ B₁ B l1 cb1 in
-    let B↝B' = ↝-create-block t₂ B B' l2 cb2 in
-    {!!} --↝-trans B₁↝B B↝B'
+explicate-pred-blocks (Atom a) t₁ t₂ t B₁ B₂ refl =
+    let (l1 , B) = create-block t₁ B₁ in 
+    let (l2 , B') = create-block t₂ B in 
+    let B₁↝B = ↝-create-block t₁ B₁ B l1 refl in
+    let B↝B' = ↝-create-block t₂ B B' l2 refl in
+    ↝-trans B₁↝B B↝B'
 explicate-pred-blocks Read t₁ t₂ t B₁ B₂ refl = [] , ++-identityʳ B₁ 
 explicate-pred-blocks (Uni Neg a) t₁ t₂ t B₁ B₂ refl = [] , (++-identityʳ B₁)
-explicate-pred-blocks (Uni Not a) t₁ t₂ t B₁ B₂ ep
-    with create-block t₂ B₁ in cb2
-... | l2 , B
-    with create-block t₁ B in cb1
-... | l1 , B'
-    with ep
-... | refl =
-    let B₁↝B = ↝-create-block t₂ B₁ B l2 cb2 in
-    let B↝B' = ↝-create-block t₁ B B' l1 cb1 in
-    {!!} --↝-trans B₁↝B B↝B'
-explicate-pred-blocks (Bin op a₁ a₂) t₁ t₂ t B₁ B₂ ep
-    with create-block t₁ B₁ in cb1
-... | l1 , B
-    with create-block t₂ B in cb2
-... | l2 , B'
-    with ep
-... | refl =
-    let B₁↝B = ↝-create-block t₁ B₁ B l1 cb1 in
-    let B↝B' = ↝-create-block t₂ B B' l2 cb2 in
-    {!!} --↝-trans B₁↝B B↝B'
-explicate-pred-blocks (Assign x m₁ m₂) thn els t B₁ B₂ ep
-    with explicate-pred m₂ thn els B₁ in el2
-... | (t₂ , B)
-    =
-    let B₁↝B = explicate-pred-blocks m₂ thn els t₂ B₁ B el2 in
+explicate-pred-blocks (Uni Not a) t₁ t₂ t B₁ B₂ refl =
+    let (l2 , B) = create-block t₂ B₁ in
+    let (l1 , B') = create-block t₁ B in 
+    let B₁↝B = ↝-create-block t₂ B₁ B l2 refl in
+    let B↝B' = ↝-create-block t₁ B B' l1 refl in
+    ↝-trans B₁↝B B↝B'
+explicate-pred-blocks (Bin op a₁ a₂) t₁ t₂ t B₁ B₂ refl =
+    let (l1 , B) = create-block t₁ B₁ in 
+    let (l2 , B') = create-block t₂ B in 
+    let B₁↝B = ↝-create-block t₁ B₁ B l1 refl in
+    let B↝B' = ↝-create-block t₂ B B' l2 refl in
+    ↝-trans B₁↝B B↝B'
+explicate-pred-blocks (Assign x m₁ m₂) thn els t B₁ B₂ ep =
+    let (t₂ , B) = explicate-pred m₂ thn els B₁ in 
+    let B₁↝B = explicate-pred-blocks m₂ thn els t₂ B₁ B refl in
     let B↝B₂ = explicate-assign-blocks x m₁ t₂ t B B₂ ep in
     ↝-trans B₁↝B B↝B₂ 
-explicate-pred-blocks (If m₁ m₂ m₃) thn els t B₁ B₂ ep
-    with create-block thn B₁ in cb1
-... | lbl-thn , B
-    with create-block els B in cb2
-... | lbl-els , B'
-    with explicate-pred m₂ (Goto lbl-thn) (Goto lbl-els) B' in ep2
-... | t₂ , B''
-    with explicate-pred m₃ (Goto lbl-thn) (Goto lbl-els) B'' in ep3
-... | t₃ , B'''
-    =
-    let B₁↝B = ↝-create-block thn B₁ B lbl-thn cb1 in
-    let B↝B' = ↝-create-block els B B' lbl-els cb2 in
-    let B'↝B'' = explicate-pred-blocks m₂ (Goto lbl-thn) (Goto lbl-els) t₂ B' B'' ep2 in
-    let B''↝B''' = explicate-pred-blocks m₃ (Goto lbl-thn) (Goto lbl-els) t₃ B'' B''' ep3 in
-    let B'''↝B₂ = explicate-pred-blocks m₁ t₂ t₃ t B''' B₂ {!!} in --ep in
+explicate-pred-blocks (If m₁ m₂ m₃) thn els t B₁ B₂ refl =
+    let (lbl-thn , B) = create-block thn B₁ in 
+    let (lbl-els , B') = create-block els B in 
+    let (t₂ , B'') = explicate-pred m₂ (Goto lbl-thn) (Goto lbl-els) B' in 
+    let (t₃ , B''') = explicate-pred m₃ (Goto lbl-thn) (Goto lbl-els) B'' in 
+    let B₁↝B = ↝-create-block thn B₁ B lbl-thn refl in
+    let B↝B' = ↝-create-block els B B' lbl-els refl in
+    let B'↝B'' = explicate-pred-blocks m₂ (Goto lbl-thn) (Goto lbl-els) t₂ B' B'' refl in
+    let B''↝B''' = explicate-pred-blocks m₃ (Goto lbl-thn) (Goto lbl-els) t₃ B'' B''' refl in
+    let B'''↝B₂ = explicate-pred-blocks m₁ t₂ t₃ t B''' B₂ refl in
     ↝-trans B₁↝B (↝-trans B↝B' (↝-trans B'↝B'' (↝-trans B''↝B''' B'''↝B₂)))
 
 nth-blocks : ∀ {B₁ B₂ : Blocks} {l : ℕ} {t : CTail}
