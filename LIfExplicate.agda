@@ -1,332 +1,163 @@
 --------------- Proof of correctness for Explicate Control -------------------
 
-_↝_ : Blocks → Blocks → Set
-B₁ ↝ B₂ = Σ[ B ∈ Blocks ] B₁ ++ B ≡ B₂
+-- This one is broken because big-step doesn't work. See below.
 
-↝-trans : ∀ {B₁ B₂ B₃ : Blocks}
-  → B₁ ↝ B₂  → B₂ ↝ B₃
-  → B₁ ↝ B₃
-↝-trans {B₁}{B₂}{B₃} (B , eq12) (B' , eq23)
-  rewrite sym eq12 | sym eq23  | ++-assoc B₁ B B'
-  = B ++ B' , refl
+explicate-tail-correct : ∀ {e : IL1-Exp}{ρ : Env Value}{B B' : Blocks}{t : CTail}{s : Inputs}{r : Value × Inputs}
+  → explicate-tail e B ≡ (t , B')
+  → interp-il1-exp e ρ s ≡ just r
+  →  ρ , s , B' ⊢ t ⇓ r
+  
+explicate-assign-correct : ∀{y : Id}{e : IL1-Exp} {t t' : CTail}{ρ : Env Value}
+   {B₂ B₃ : Blocks} {s s1 : Inputs} {v : Value}{r : Value × Inputs}
+  → explicate-assign y e t B₂ ≡ (t' , B₃)
+  → interp-il1-exp e ρ s ≡ just (v , s1)
+  → (update ρ y v) , s1 , B₃ ⊢ t ⇓ r
+  → ρ , s , B₃ ⊢ t' ⇓ r
 
-↝-create-block : (t : CTail) (B B' : Blocks) (lbl : ℕ)
-  → create-block t B ≡ (lbl , B')
-  → B ↝ B'
-↝-create-block (Return x) B B' lbl refl = [ Return x ] , refl
-↝-create-block (Let x t) B B' lbl refl = [ Let x t ] , refl
-↝-create-block (If x x₁ x₂ x₃ x₄) B B' lbl refl = [ If x x₁ x₂ x₃ x₄ ] , refl
-↝-create-block (Goto lbl) B B lbl refl = [] , (++-identityʳ B)
+explicate-pred-correct : ∀ (e₁ : IL1-Exp) (t₁ t₂ t₃ : CTail) (ρ : Env Value)
+    (B₄ B₅ : Blocks) (s s1 : Inputs) (r : Value × Inputs) (b : 𝔹)
+  → explicate-pred e₁ t₂ t₃ B₄ ≡ (t₁ , B₅)
+  → interp-il1-exp e₁ ρ s ≡ just (Value.Bool b , s1)
+  -- Problem! ρ is incorrect below, if e₁ is Assign, ρ changes!
+  → ρ , s1 , B₅ ⊢ (if b then t₂ else t₃) ⇓ r
+  → ρ , s , B₅ ⊢ t₁ ⇓ r
 
+explicate-assign-correct {y} {Atom a} {t} {t'} {ρ} {B₂} {B₃} {s} ea ie t⇓ = {!!}
+explicate-assign-correct {y} {Read} {t} {t'} {ρ} {B₂} {B₃} {s} ea ie t⇓ = {!!}
+explicate-assign-correct {y} {Uni op a} {t} {t'} {ρ} {B₂} {B₃} {s} ea ie t⇓ = {!!}
+explicate-assign-correct {y} {Bin op a₁ a₂} {t} {t'} {ρ} {B₂} {B₃} {s} ea ie t⇓ = {!!}
+explicate-assign-correct {y} {Assign x e₁ e₂} {t} {t'} {ρ} {B₂} {B₃} {s} ea ie t⇓ = {!!}
+explicate-assign-correct {y} {If e₁ e₂ e₃} {t} {t'} {ρ} {B₂} {B₃} {s} ea ie t⇓ = {!!}
 
-explicate-tail-blocks : ∀ (m : Mon) (B₁ B₂ : Blocks) (t : CTail)
-  → explicate-tail m B₁ ≡ (t , B₂)
-  → B₁ ↝ B₂
-
-explicate-let-blocks : ∀ (m : Mon) (t t' : CTail) (B₁ B₂ : Blocks)
-  → explicate-let m t B₁ ≡ (t' , B₂)
-  → B₁ ↝ B₂
-
-explicate-pred-blocks : ∀ (m : Mon) (t₁ t₂ t : CTail) (B₁ B₂ : Blocks)
-  → explicate-pred m t₁ t₂ B₁ ≡ (t , B₂)
-  → B₁ ↝ B₂
-
-explicate-tail-blocks (Atom a) B₁ B₂ t refl = [] , (++-identityʳ B₁)
-explicate-tail-blocks Read B₁ B₂ t refl = [] , (++-identityʳ B₁)
-explicate-tail-blocks (Uni op a) B₁ B₂ t refl = [] , ++-identityʳ B₁
-explicate-tail-blocks (Bin op a₁ a₂) B₁ B₂ t refl = [] , ++-identityʳ B₁
-explicate-tail-blocks (Let m₁ m₂) B₁ B₂ t refl
-    with explicate-tail m₂ B₁ in et
-... | (t₂ , B)
-    with explicate-let m₁ t₂ B in el
-... | (t₁ , B') =
-  let B₁↝B = explicate-tail-blocks m₂ B₁ B t₂ et in
-  let B↝B' = explicate-let-blocks m₁ t₂ t₁ B B' el in
-  ↝-trans B₁↝B B↝B'
-explicate-tail-blocks (If m₁ m₂ m₃) B₁ B₂ t et
-    with explicate-tail m₂ B₁ in et2
-... | (t₂ , B)
-    with explicate-tail m₃ B in et3
-... | (t₃ , B') =
-    let B₁↝B = explicate-tail-blocks m₂ B₁ B t₂ et2 in
-    let B↝B' = explicate-tail-blocks m₃ B B' t₃ et3 in
-    let B'↝B₂ = explicate-pred-blocks m₁ t₂ t₃ t B' B₂ et in
-    ↝-trans B₁↝B (↝-trans B↝B' B'↝B₂)
-
-explicate-let-blocks (Atom a) t t' B₁ B₂ refl = [] , ++-identityʳ B₁
-explicate-let-blocks Read t t' B₁ B₂ refl = [] , (++-identityʳ B₁)
-explicate-let-blocks (Uni op a) t t' B₁ B₂ refl = [] , ++-identityʳ B₁
-explicate-let-blocks (Bin op a₁ a₂) t t' B₁ B₂ refl = [] , ++-identityʳ B₁
-explicate-let-blocks (Let m₁ m₂) t t' B₁ B₂ el1
-    with explicate-let m₂ (shift-tail t 1) B₁ in el2
-... | (t₂ , B) =
-  let B₁↝B = explicate-let-blocks m₂ (shift-tail t 1) t₂ B₁ B el2 in
-  let B↝B₂ = explicate-let-blocks m₁ t₂ t' B B₂ el1 in
-  ↝-trans B₁↝B B↝B₂ 
-explicate-let-blocks (If m₁ m₂ m₃) t t' B₁ B₂ el
-    with create-block t B₁ in cb1
-... | cont , B
-    with explicate-let m₂ (Goto cont) B in el2
-... | t₂ , B'
-    with explicate-let m₃ (Goto cont) B' in el3
-... | t₃ , B'' =
-    let B₁↝B = ↝-create-block t B₁ B cont cb1 in
-    let B↝B' = explicate-let-blocks m₂ (Goto cont) t₂ B B' el2 in
-    let B'↝B'' = explicate-let-blocks m₃ (Goto cont) t₃ B' B'' el3 in
-    let B''↝B₂ = explicate-pred-blocks m₁ t₂ t₃ t' B'' B₂ el in
-    ↝-trans B₁↝B (↝-trans B↝B' (↝-trans B'↝B'' B''↝B₂))
-
-explicate-pred-blocks (Atom a) t₁ t₂ t B₁ B₂ ep
-    with create-block t₁ B₁ in cb1
-... | l1 , B
-    with create-block t₂ B in cb2
-... | l2 , B'
-    with ep
-... | refl =
-    let B₁↝B = ↝-create-block t₁ B₁ B l1 cb1 in
-    let B↝B' = ↝-create-block t₂ B B' l2 cb2 in
-    ↝-trans B₁↝B B↝B'
-explicate-pred-blocks Read t₁ t₂ t B₁ B₂ refl = [] , ++-identityʳ B₁ 
-explicate-pred-blocks (Uni Neg a) t₁ t₂ t B₁ B₂ refl = [] , (++-identityʳ B₁)
-explicate-pred-blocks (Uni Not a) t₁ t₂ t B₁ B₂ ep
-    with create-block t₂ B₁ in cb2
-... | l2 , B
-    with create-block t₁ B in cb1
-... | l1 , B'
-    with ep
-... | refl =
-    let B₁↝B = ↝-create-block t₂ B₁ B l2 cb2 in
-    let B↝B' = ↝-create-block t₁ B B' l1 cb1 in
-    ↝-trans B₁↝B B↝B'
-explicate-pred-blocks (Bin op a₁ a₂) t₁ t₂ t B₁ B₂ ep
-    with create-block t₁ B₁ in cb1
-... | l1 , B
-    with create-block t₂ B in cb2
-... | l2 , B'
-    with ep
-... | refl =
-    let B₁↝B = ↝-create-block t₁ B₁ B l1 cb1 in
-    let B↝B' = ↝-create-block t₂ B B' l2 cb2 in
-    ↝-trans B₁↝B B↝B'
-explicate-pred-blocks (Let m₁ m₂) thn els t B₁ B₂ ep
-    with explicate-pred m₂ (shift-tail thn 1) (shift-tail els 1) B₁ in el2
-... | (t₂ , B)
+explicate-tail-correct {(Atom a)} refl ie = return-⇓ ie
+explicate-tail-correct {Read} refl ie = return-⇓ ie
+explicate-tail-correct {(Uni op a)} refl ie = return-⇓ ie
+explicate-tail-correct {(Bin op a₁ a₂)} refl ie = return-⇓ ie
+explicate-tail-correct {(Assign x e₁ e₂)}{ρ}{B}{B'}{t}{s}{r} et ie
+    with explicate-tail e₂ B in et2
+... | t₂ , B₁
+    with interp-il1-exp e₁ ρ s in ie1 | ie
+... | nothing | ()
+... | just (v₁ , s1) | ie2
+    with explicate-tail-correct {e₂} et2 ie2
+... | t₂⇓r
     =
-    let B₁↝B = explicate-pred-blocks m₂ (shift-tail thn 1) (shift-tail els 1) t₂ B₁ B el2 in
-    let B↝B₂ = explicate-let-blocks m₁ t₂ t B B₂ ep in
-    ↝-trans B₁↝B B↝B₂ 
-explicate-pred-blocks (If m₁ m₂ m₃) thn els t B₁ B₂ ep
-    with create-block thn B₁ in cb1
-... | lbl-thn , B
-    with create-block els B in cb2
-... | lbl-els , B'
-    with explicate-pred m₂ (Goto lbl-thn) (Goto lbl-els) B' in ep2
-... | t₂ , B''
-    with explicate-pred m₃ (Goto lbl-thn) (Goto lbl-els) B'' in ep3
-... | t₃ , B'''
+    let B₁↝B' = explicate-assign-blocks x e₁ t₂ t B₁ B' et in
+    let B'⊢t₂⇓r = eval-tail-blocks t₂ (update ρ x v₁) B₁ B' s1 (r .proj₂) (r .proj₁) B₁↝B' t₂⇓r in
+    explicate-assign-correct {e = e₁} et ie1 B'⊢t₂⇓r
+explicate-tail-correct {(If e₁ e₂ e₃)}{ρ}{B}{B'}{t}{s}{r} et ie
+    with explicate-tail e₂ B in et2
+... | t₂ , B₁
+    with explicate-tail e₃ B₁ in et3
+... | t₃ , B₂
+    with interp-il1-exp e₁ ρ s in ie1 | ie
+... | nothing | ()
+... | just (Int n , s1) | ()
+... | just (Bool true , s1) | ie2 =
+    let t₂⇓r = explicate-tail-correct {e₂} et2 ie2 in
+    let B₁↝B₂ = explicate-tail-blocks e₃ B₁ B₂ t₃ et3 in
+    let B₂↝B' = explicate-pred-blocks e₁ t₂ t₃ t B₂ B' et in
+    let B'⊢t₂⇓r = eval-tail-blocks t₂ ρ B₁ B' s1 (r .proj₂) (r .proj₁) (↝-trans B₁↝B₂ B₂↝B') t₂⇓r in
+    explicate-pred-correct e₁ t t₂ t₃ ρ B₂ B' s s1 r true et ie1 B'⊢t₂⇓r
+... | just (Bool false , s1) | ie2 =
+    let t₃⇓r = explicate-tail-correct {e₃} et3 ie2 in
+    let B₂↝B' = explicate-pred-blocks e₁ t₂ t₃ t B₂ B' et in
+    let B'⊢t₃⇓r = eval-tail-blocks t₃ ρ B₂ B' s1 (r .proj₂) (r .proj₁) B₂↝B' t₃⇓r in
+    explicate-pred-correct e₁ t t₂ t₃ ρ B₂ B' s s1 r false et ie1 B'⊢t₃⇓r
+
+explicate-pred-correct (Atom a) t₁ t₂ t₃ ρ B B′ s s1 r b refl ie eb
+    with interp-atm a ρ in ia | ie
+... | nothing | ()
+... | just (Bool true) | refl =
+    if-⇓-true cond (goto-⇓ nth-t₂ eb)
+    where
+    nth-t₂ : nth ((B ++ t₂ ∷ []) ++ t₃ ∷ []) (length B) ≡ just t₂
+    nth-t₂ rewrite ++-assoc B [ t₂ ] [ t₃ ] | sym (+-identityʳ (length B))
+       | nth-++-+ B (t₂ ∷ t₃ ∷ []) 0 = refl
+    cond : interp-CExp (Bin Eq a (Bool true)) ρ s ≡ just (Bool true , s)
+    cond rewrite ia = refl
+... | just (Bool false) | refl =
+    if-⇓-false cond (goto-⇓ nth-t₃ eb)
+    where
+    nth-t₃ : nth ((B ++ t₂ ∷ []) ++ t₃ ∷ []) (length (B ++ t₂ ∷ [])) ≡ just t₃
+    nth-t₃ rewrite sym (+-identityʳ (length (B ++ t₂ ∷ [])))
+        | nth-++-+ (B ++ t₂ ∷ []) [ t₃ ] 0 = refl
+    cond : interp-CExp (Bin Eq a (Bool true)) ρ s ≡ just (Bool false , s)
+    cond rewrite ia = refl
+explicate-pred-correct Read t₁ t₂ t₃ ρ B₄ B₅ s s1 r b ep () eb
+explicate-pred-correct (Uni Neg a) t₁ t₂ t₃ ρ B₄ B₅ s s1 r b ep ie eb
+    with interp-atm a ρ | ie
+... | nothing | ()
+... | just (Int x) | ()
+... | just (Bool x) | ()
+explicate-pred-correct (Uni Not a) t₁ t₂ t₃ ρ B B′ s s1 r b refl ie eb
+    with interp-atm a ρ in ia | ie
+... | nothing | ()
+... | just (Bool true) | refl =
+    if-⇓-true cond (goto-⇓ nth-t₃ eb)
+    where
+    nth-t₃ : nth ((B ++ t₃ ∷ []) ++ t₂ ∷ []) (length B) ≡ just t₃
+    nth-t₃ rewrite ++-assoc B [ t₃ ] [ t₂ ] | sym (+-identityʳ (length B))
+      | nth-++-+ B (t₃ ∷ t₂ ∷ []) 0 = refl
+    cond : interp-CExp (Bin Eq a (Bool true)) ρ s ≡ just (Bool true , s)
+    cond rewrite ia = refl
+... | just (Bool false) | refl =
+    if-⇓-false cond (goto-⇓ nth-t₂ eb)
+    where
+    nth-t₂ : nth ((B ++ t₃ ∷ []) ++ t₂ ∷ []) (length (B ++ t₃ ∷ [])) ≡ just t₂
+    nth-t₂ rewrite sym (+-identityʳ (length (B ++ t₃ ∷ [])))
+        | nth-++-+ (B ++ t₃ ∷ []) [ t₂ ] 0 = refl
+
+    cond : interp-CExp (Bin Eq a (Bool true)) ρ s ≡ just (Bool false , s)
+    cond rewrite ia = refl
+explicate-pred-correct (Bin op a₁ a₂) t₁ t₂ t₃ ρ B₄ B₅ s s1 r b refl ie eb
+    with interp-atm a₁ ρ in ia1 | interp-atm a₂ ρ in ia2
+... | just v₁ | just v₂
+    with b
+... | true    
+    = if-⇓-true cond (goto-⇓ nth-t₂ eb)
+    where
+    nth-t₂ : nth ((B₄ ++ t₂ ∷ []) ++ t₃ ∷ []) (length B₄) ≡ just t₂
+    nth-t₂ rewrite ++-assoc B₄ [ t₂ ] [ t₃ ]
+        | nth-++-length B₄ (t₃ ∷ []) t₂ = refl
+
+    cond : interp-CExp (Bin op a₁ a₂) ρ s ≡ just (Bool true , s1)
+    cond rewrite ia1 | ia2 = ie
+... | false
+    = if-⇓-false cond (goto-⇓ nth-t₃ eb)
+    where
+    nth-t₃ : nth ((B₄ ++ t₂ ∷ []) ++ t₃ ∷ []) (length (B₄ ++ t₂ ∷ [])) ≡ just t₃
+    nth-t₃ rewrite nth-++-length (B₄ ++ t₂ ∷ []) [] t₃ = refl
+    cond : interp-CExp (Bin op a₁ a₂) ρ s ≡ just (Bool false , s1)
+    cond rewrite ia1 | ia2 = ie
+explicate-pred-correct (Assign x e₁ e₂) t-out thn els ρ B B' s s1 r b ep ie eb
+    with explicate-pred e₂ thn els B in et2
+... | t₂ , B₁    
+    with interp-il1-exp e₁ ρ s in ie1 | ie
+... | nothing | ()
+... | just (v₁ , s2) | ie′
     =
-    let B₁↝B = ↝-create-block thn B₁ B lbl-thn cb1 in
-    let B↝B' = ↝-create-block els B B' lbl-els cb2 in
-    let B'↝B'' = explicate-pred-blocks m₂ (Goto lbl-thn) (Goto lbl-els) t₂ B' B'' ep2 in
-    let B''↝B''' = explicate-pred-blocks m₃ (Goto lbl-thn) (Goto lbl-els) t₃ B'' B''' ep3 in
-    let B'''↝B₂ = explicate-pred-blocks m₁ t₂ t₃ t B''' B₂ ep in
-    ↝-trans B₁↝B (↝-trans B↝B' (↝-trans B'↝B'' (↝-trans B''↝B''' B'''↝B₂)))
+    let t₂⇓r = explicate-pred-correct e₂ t₂ thn els (update ρ x v₁) B B₁ s2 s1 r b et2 ie′ {!!} in
+    {!!}
+explicate-pred-correct (If e₁ e₂ e₃) t₁ t₂ t₃ ρ B₄ B₅ s s1 r b ep ie eb = {!!}
 
-nth-blocks : ∀ {B₁ B₂ : Blocks} {l : ℕ} {t : CTail}
-  → B₁ ↝ B₂
-  → nth B₁ l ≡ just t
-  → nth B₂ l ≡ just t
-nth-blocks {B₁}{l = l}{t} (B , refl) n1 = nth-++-just B₁ B l t n1
 
-eval-tail-blocks : ∀ (t : CTail) (ρ : Env Value) (B₁ B₂ : Blocks) (s s' : Inputs) (v : Value)
-  → B₁ ↝ B₂
-  → ρ , s , B₁ ⊢ t ⇓ (v , s')
-  → ρ , s , B₂ ⊢ t ⇓ (v , s')
-eval-tail-blocks (Return e) ρ B₁ B₂ s s' v B12 (return-⇓ eq) = return-⇓ eq
-eval-tail-blocks (Let e t) ρ B₁ B₂ s s' v B12 (let-⇓ ie t⇓) = let-⇓ ie (eval-tail-blocks t (_ ∷ ρ) B₁ B₂ _ s' v B12 t⇓)
-eval-tail-blocks (If op a₁ a₂ thn els) ρ B₁ B₂ s s' v B12 (if-⇓-true iop nth t⇓) =
-  if-⇓-true iop (nth-blocks B12 nth) (eval-tail-blocks _ ρ B₁ B₂ _ s' v B12 t⇓)
-eval-tail-blocks (If op a₁ a₂ thn els) ρ B₁ B₂ s s' v B12 (if-⇓-false iop nth t⇓) =
-  if-⇓-false iop (nth-blocks B12 nth) (eval-tail-blocks _ ρ B₁ B₂ _ s' v B12 t⇓)
-eval-tail-blocks (Goto l) ρ B₁ B₂ s s' v B12 (goto-⇓ nth t⇓) =
-  goto-⇓ (nth-blocks B12 nth) (eval-tail-blocks _ ρ B₁ B₂ s s' v B12 t⇓)
-
-interp-shift-exp : ∀ (e : CExp) (v : Value) (ρ₁ ρ₂ : Env Value)
-  → interp-CExp (shift-exp e (length ρ₁)) (ρ₁ ++ (v ∷ ρ₂))
-    ≡ interp-CExp e (ρ₁ ++ ρ₂)
-interp-shift-exp (Atom atm) v ρ₁ ρ₂ rewrite interp-shift-atm atm v ρ₁ ρ₂ = refl
-interp-shift-exp Read v ρ₁ ρ₂ = refl
-interp-shift-exp (Uni op a) v ρ₁ ρ₂
-    rewrite interp-shift-atm a v ρ₁ ρ₂
-    with interp-atm a (ρ₁ ++ ρ₂) 
-... | nothing = refl
-... | just v = refl
-
-interp-shift-exp (Bin op a₁ a₂) v ρ₁ ρ₂ 
-    rewrite interp-shift-atm a₁ v ρ₁ ρ₂ | interp-shift-atm a₂ v ρ₁ ρ₂
-    with interp-atm a₁ (ρ₁ ++ ρ₂) 
-... | nothing = refl
-... | just v₁
-    with interp-atm a₂ (ρ₁ ++ ρ₂)
-... | nothing = refl
-... | just v₂ = refl
-
-eval-shift-tail : ∀ (t : CTail) (v v' : Value) (ρ₁ ρ₂ : Env Value) (B : Blocks) (s s' : Inputs) 
-  → (ρ₁ ++ (v ∷ ρ₂)) , s , B ⊢ shift-tail t (length ρ₁) ⇓ (v' , s')
-  → (ρ₁ ++ ρ₂) , s , B ⊢ t ⇓ (v' , s')
-eval-shift-tail (Return e) v v' ρ₁ ρ₂ B s s' (return-⇓ ie) = return-⇓ Goal
+explicate-correct : ∀ (p : IL1-Prog) (s : Inputs) (v : Value)
+  → interp-IL1 p s ≡ just v
+  → eval-CIf (explicate p) s  v
+explicate-correct (Program n e) s v ip
+    with explicate-tail e [] in ete
+... | t , B
+    with create-block t B in cb
+... | lbl , B'    
+    with interp-il1-exp e (replicate n (Int (ℤ.pos 0))) s in ie | ip
+... | nothing | ()
+... | just (v , s1) | refl
+    =
+    let ρ₀ = replicate n (Int (ℤ.pos 0)) in
+    let t⇓ = explicate-tail-correct {e}{ρ₀}{[]}{B} ete ie in
+    s1 , goto-⇓ eq (eval-tail-blocks t ρ₀ B (B ++ t ∷ []) s s1 _ ((t ∷ []) , refl) t⇓)
     where
-    Goal : interp-CExp e (ρ₁ ++ ρ₂) s ≡ just (v' , s')
-    Goal rewrite interp-shift-exp e v ρ₁ ρ₂ = ie
-eval-shift-tail (Let e t) v v' ρ₁ ρ₂ B s s' (let-⇓{s1 = s1}{v = v₁} ie et) =
-    let-⇓ Goal (eval-shift-tail t v v' (v₁ ∷ ρ₁) ρ₂ B s1 s' et)
-    where
-    Goal : interp-CExp e (ρ₁ ++ ρ₂) s ≡ just (v₁ , s1)
-    Goal rewrite interp-shift-exp e v ρ₁ ρ₂ = ie
-eval-shift-tail (If op a₁ b₂ thn els) v v' ρ₁ ρ₂ B s s' (if-⇓-true {s1 = s1}{t-thn = t-thn} iop nth est) =
-  if-⇓-true {!!} nth (eval-shift-tail t-thn v v' ρ₁ ρ₂ B s1 s' {!est!} )
-eval-shift-tail (If op a₁ b₂ thn els) v v' ρ₁ ρ₂ B s s' (if-⇓-false iop nth est) = {!!}
-eval-shift-tail (Goto l) v v' ρ₁ ρ₂ B s s' est = {!!}
+    eq : nth (B ++ t ∷ []) (foldr (λ _ → suc) 0 B) ≡ just t
+    eq rewrite sym (+-identityʳ (length B)) | nth-++-+ B (t ∷ []) 0 = refl
 
-
--- TODO: add the premise: B₁ is a prefix of B₂
-postulate interp-tail-blocks : ∀ (n : ℕ) (t : CTail) (ρ : Env Value) (B₁ B₂ : Blocks) (s : Inputs) → interp-tail n t ρ B₁ s ≡ interp-tail n t ρ B₂ s
-
--- Problem: this isn't true... increasing the gas could turn a timeout into a good result...
-postulate interp-tail-mono : ∀ (n n' : ℕ)(t : CTail) (ρ : Env Value) (B : Blocks) (s : Inputs) → n ≤ n' → interp-tail n t ρ B s ≡ interp-tail n' t ρ B s
-
-postulate interp-shift-tail : ∀ (n : ℕ) (t : CTail) (v : Value) (ρ₁ ρ₂ : Env Value) (B : Blocks) (s : Inputs) → interp-tail n (shift-tail t (length ρ₁)) (ρ₁ ++ (v ∷ ρ₂)) B s ≡ interp-tail n t (ρ₁ ++ ρ₂) B s
-
-interp-tail-def : ∀ n (e : CExp) (t : CTail) ρ B s
-    → interp-tail (suc n) (Let e t) ρ B s
-     ≡ ((interp-CExp e ρ) then λ v₁ → interp-tail n t (v₁ ∷ ρ) B) s
-interp-tail-def zero e t ρ B s rewrite then-timeout{B = Value} (interp-CExp e ρ) s = refl
-interp-tail-def (suc n) e t ρ B s = refl
-
-explicate-let-correct :  ∀ (m : Mon) (t t' : CTail) (ρ : Env Value) (B₂ B₃ : Blocks) (s : Inputs)
-  → explicate-let m t B₂ ≡ (t' , B₃)
-  → Σ[ n ∈ ℕ ] interp-tail (suc n) t' ρ B₃ s
-      ≡ ((interp-mon m ρ) then λ v → interp-tail n t (v ∷ ρ) B₃) s
-explicate-let-correct (Atom a) t t' ρ B B₂ s refl = 0 , refl
-explicate-let-correct Read t t' ρ B B₂ s refl = 0 , refl
-explicate-let-correct (Uni op a) t t' ρ B B₂ s refl = 0 , refl
-explicate-let-correct (Bin op a₁ a₂) t t' ρ B B₂ s refl = 0 , refl
-explicate-let-correct (Let m₁ m₂) t t' ρ B₂ B₃ s el
-    with explicate-let m₂ (shift-tail t 1) B₂ in et2
-... | t₂ , B₄
-    with explicate-let-correct m₁ t₂ t' ρ B₄ B₃ s el
-... | n , IH1
-    = n , Goal
-    where
-    Goal : interp-tail (suc n) t' ρ B₃ s ≡
-          (((λ s₁ →
-           (interp-mon m₁ ρ then (λ v₁ → interp-mon m₂ (v₁ ∷ ρ))) s₁)
-            then (λ v → interp-tail n t (v ∷ ρ) B₃)) s)
-    Goal rewrite IH1
-        with interp-mon m₁ ρ s
-    ... | nothing = refl
-    ... | just (v₁ , s1)
-        with explicate-let-correct m₂ (shift-tail t 1) t₂ (v₁ ∷ ρ) B₂ B₄ s1 et2
-    ... | k , IH2
-        rewrite interp-tail-mono n ((suc k) ⊔ n) t₂ (v₁ ∷ ρ) B₃ s1 (m≤n⊔m (suc k) n)
-        | interp-tail-mono (suc k) ((suc k) ⊔ n) t₂ (v₁ ∷ ρ) B₄ s1 (m≤m⊔n (suc k) n)
-        | interp-tail-blocks (suc k ⊔ n) t₂ (v₁ ∷ ρ) B₄ B₃ s1
-        | IH2
-        with interp-mon m₂ (v₁ ∷ ρ) s1
-    ... | nothing = refl
-    ... | just (v₂ , s2)
-        rewrite interp-tail-mono k (k ⊔ n) (shift-tail t 1) (v₂ ∷ v₁ ∷ ρ) B₄ s2 (m≤m⊔n k n)
-        | interp-tail-blocks (k ⊔ n) (shift-tail t 1) (v₂ ∷ v₁ ∷ ρ) B₄ B₃ s2
-        | interp-tail-mono n (k ⊔ n) t (v₂ ∷ ρ) B₃ s2 (m≤n⊔m k n)
-        | interp-shift-tail (k ⊔ n) t v₁ [ v₂ ] ρ B₃ s2
-        = refl
-explicate-let-correct (If m₁ m₂ m₃) t t' ρ B B₂ s el = {!!}
-
-explicate-pred-correct : ∀ (m₁ : Mon) (t₁ t₂ t₃ : CTail) (ρ : Env Value) (B₄ B₅ : Blocks) (s : Inputs)
-  → explicate-pred m₁ t₂ t₃ B₄ ≡ (t₁ , B₅)
-  → Σ[ n ∈ ℕ ] interp-tail n t₁ ρ B₅ s
-      ≡ ((interp-mon m₁ ρ) then
-        λ v → try (toBool v) then
-        λ { true →  interp-tail n t₂ ρ B₅
-          ; false → interp-tail n t₃ ρ B₅ }) s
-explicate-pred-correct m₁ t₂ t₃ ρ B₄ B₅ s ep = {!!}
-
-explicate-tail-correct : ∀ (m : Mon) (ρ : Env Value) (B B' : Blocks) (t : CTail) (s : Inputs)
-  → explicate-tail m B ≡ (t , B')
-  → Σ[ n ∈ ℕ ] interp-tail n t ρ B' s ≡ interp-mon m ρ s
-explicate-tail-correct (Atom a) ρ B B' t s refl = 1 , refl 
-explicate-tail-correct Read ρ B B' t s refl = 1 , refl
-explicate-tail-correct (Uni op a) ρ B B' t s refl = 1 , refl
-explicate-tail-correct (Bin op a₁ a₂) ρ B B' t s refl = 1 , refl
-explicate-tail-correct (Let m₁ m₂) ρ B B' t s et
-    with explicate-tail m₂ B in et2
-... | t₂ , B₂
-    with explicate-let m₁ t₂ B₂ in el
-... | t₁ , B₃
-    with et
-... | refl
-    with explicate-let-correct m₁ t₂ t₁ ρ B₂ B₃ s el
-... | n , it1
-    with interp-mon m₁ ρ s
-... | nothing = suc n , it1
-... | just (v , s') 
-    with explicate-tail-correct m₂ (v ∷ ρ) B B₂ t₂ s' et2
-... | n' , it2
-    = (suc n) ⊔ n' , Goal
-   where
-   Goal : interp-tail ((suc n) ⊔ n') t₁ ρ B₃ s ≡ interp-mon m₂ (v ∷ ρ) s'
-   Goal
-     rewrite interp-tail-mono (suc n) ((suc n) ⊔ n') t₁ ρ B₃ s (m≤m⊔n (suc n) n') -- upgrade it1
-     | it1
-     | interp-tail-mono n' ((suc n) ⊔ n') t₂ (v ∷ ρ) B₂ s' (m≤n⊔m (suc n) n')
-     | interp-tail-mono n ((suc n) ⊔ n') t₂ (v ∷ ρ) B₃ s' (≤-trans (n≤1+n _) (m≤m⊔n (suc n) n')) -- upgrade the goal
-     | interp-tail-blocks ((suc n) ⊔ n') t₂ (v ∷ ρ) B₂ B₃ s'
-     | it2
-     = refl
-explicate-tail-correct (If m₁ m₂ m₃) ρ B B' t s et
-    with explicate-tail m₂ B in et2
-... | t₂ , B₂
-    with explicate-tail m₃ B₂ in et3
-... | t₃ , B₃
-    with explicate-pred m₁ t₂ t₃ B₃ in ep
-... | t₁ , B₄    
-    with et
-... | refl
-    with explicate-pred-correct m₁ t₁ t₂ t₃ ρ B₃ B₄ s ep
-... | n , it1    
-    with interp-mon m₁ ρ s
-... | nothing = n , it1
-... | just (Int m , s') = n , it1
-... | just (Bool true , s')
-    with explicate-tail-correct m₂ ρ B B₂ t₂ s' et2
-... | n' , it2 = n ⊔ n' , Goal
-    where
-    Goal : interp-tail (n ⊔ n') t₁ ρ B₄ s ≡ interp-mon m₂ ρ s'
-    Goal
-        rewrite interp-tail-mono n (n ⊔ n') t₁ ρ B₄ s (m≤m⊔n n n')
-        | it1
-        | interp-tail-mono n (n ⊔ n') t₂ ρ B₄ s' (m≤m⊔n n n')
-        | interp-tail-mono n' (n ⊔ n') t₂ ρ B₂ s' (m≤n⊔m n n')
-        | interp-tail-blocks (n ⊔ n') t₂ ρ B₂ B₄ s'
-        | it2
-        = refl
-explicate-tail-correct (If m₁ m₂ m₃) ρ B B' t s et | t₂ , B₂ | t₃ , B₃ | t₁ , B₄ | refl | n , it1    
-    | just (Bool false , s')
-    with explicate-tail-correct m₃ ρ B₂ B₃ t₃ s' et3
-... | n' , it3 = n ⊔ n' , Goal
-    where
-    Goal : interp-tail (n ⊔ n') t₁ ρ B₄ s ≡ interp-mon m₃ ρ s'
-    Goal
-        rewrite interp-tail-mono n (n ⊔ n') t₁ ρ B₄ s (m≤m⊔n n n')
-        | it1
-        | interp-tail-mono n (n ⊔ n') t₃ ρ B₄ s' (m≤m⊔n n n')
-        | interp-tail-mono n' (n ⊔ n') t₃ ρ B₃ s' (m≤n⊔m n n')
-        | interp-tail-blocks (n ⊔ n') t₃ ρ B₃ B₄ s'
-        | it3
-        = refl
-
-explicate-correct : ∀ (m : Mon) (s : Inputs)
-  → Σ[ n ∈ ℕ ] interp-CIf n (explicate m) s ≡ interp-LMonIf m s
-explicate-correct m s
-    with explicate-tail m []
-... | t , B' = {!!} -- rewrite explicate-tail-correct m [] s = refl

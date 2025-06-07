@@ -9,12 +9,9 @@ open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality
    using (_≡_; _≢_; refl; trans; sym; cong; cong-app)
+open import Utilities
 
 ----------------- Reader (ish) Monad ----------------------------
-
--- stream of integers
-Inputs : Set
-Inputs = ℕ × (ℕ → ℤ)
 
 Reader : Set → Set
 Reader A = Inputs → Maybe (A × Inputs)

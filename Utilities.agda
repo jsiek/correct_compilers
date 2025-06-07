@@ -22,6 +22,10 @@ Id = ℕ
 Env : Set → Set
 Env A = List A
 
+-- stream of integers for input
+Inputs : Set
+Inputs = ℕ × (ℕ → ℤ)
+
 nth : ∀{A : Set} → Env A → Id → Maybe A
 nth [] i = nothing
 nth (x ∷ xs) zero    = just x
