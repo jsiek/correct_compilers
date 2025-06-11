@@ -255,39 +255,32 @@ write : Dest → ℤ → StateX86 → StateX86
 write (Var x) v (inputs , regs , ρ) = (inputs , regs , update ρ x v)
 write (Reg x) v (inputs , regs , ρ) = (inputs , update regs x v , ρ)
 
-interp-inst : Inst → StateX86 → Maybe StateX86
-interp-inst (MovQ src dest) s
-    with interp-arg src s
-... | nothing = nothing
-... | just val = just (write dest val s)
-interp-inst (SubQ src dest) s
-    with interp-arg src s
-... | nothing = nothing
-... | just y
-    with interp-dest dest s
-... | nothing = nothing
-... | just x = just (write dest (x - y) s)
-interp-inst ReadInt (inputs , regs , ρ)
-    with read inputs
-... | nothing = nothing  
-... | just (v , inputs') =
-      just (inputs' , update regs rax v , ρ)
+infix 4 _⊢_⇓_
+data _⊢_⇓_ : StateX86 → Inst → StateX86 → Set where
+  ⇓movq : ∀{src}{dest}{s}{val}
+        → interp-arg src s ≡ just val
+        → s ⊢ (MovQ src dest) ⇓ write dest val s
+  ⇓subq : ∀{src}{dest}{s}{x y}
+        → interp-arg src s ≡ just y
+        → interp-dest dest s ≡ just x
+        → s ⊢ (SubQ src dest) ⇓ write dest (x - y) s
+  ⇓read : ∀{inputs inputs'}{regs}{ρ}{v}
+        → read inputs ≡ just (v , inputs')
+        → (inputs , regs , ρ) ⊢ ReadInt ⇓ (inputs' , update regs rax v , ρ)
 
-interp-insts : List Inst → StateX86 → Maybe StateX86
-interp-insts [] s = just s
-interp-insts (inst ∷ is) s
-    with interp-inst inst s
-... | nothing = nothing
-... | just s' = interp-insts is s'
-
-run-x86 : (StateX86 → Maybe StateX86) → ℕ → Inputs → Maybe ℤ
-run-x86 prog n inputs
-  with prog (inputs , [ 0ℤ ] , replicate n 0ℤ)
-... | nothing = nothing
-... | just (inputs' , regs , ρ) = nth regs 0
-
-interp-x86-var : X86Var → Inputs → Maybe ℤ
-interp-x86-var (Program n is) inputs = run-x86 (interp-insts is) n inputs
+infix 4 _⊩_⇓_
+data _⊩_⇓_ : StateX86 → List Inst → StateX86 → Set where
+  ⇓null : ∀{s : StateX86} → s ⊩ [] ⇓ s
+  ⇓cons : ∀{s s′ s″ : StateX86}{i}{is}
+      → s ⊢ i ⇓ s′
+      → s′ ⊩ is ⇓ s″ 
+      → s ⊩ i ∷ is ⇓ s″ 
+  
+interp-x86-var : X86Var → Inputs → ℤ → Set
+interp-x86-var (Program n is) inputs v =
+  Σ[ inputs' ∈ Inputs ] Σ[ regs ∈ List ℤ ] Σ[ ρ ∈ List ℤ ]
+  (inputs , [ 0ℤ ] , replicate n 0ℤ) ⊩ is ⇓ (inputs' , regs , ρ)
+  × nth regs 0 ≡ just v
 
 ----------------- Instruction Selection ----------------------------
 

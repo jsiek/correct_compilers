@@ -17,7 +17,7 @@ LMonVar (Atm,Mon)
   V
 CVar (CExp, CStmt, CProg)
   |
-  | select-inst
+  | select-inst      (LVarSelectCorrect.agda)
   V
 X86Var (Arg, Inst)
 
