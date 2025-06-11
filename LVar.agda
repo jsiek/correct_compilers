@@ -125,16 +125,15 @@ interp-ilprog (Program n e) s v =
 
 shifts-atm : Atm → ℕ → ℕ → Atm
 shifts-atm (Num x) c n = Num x
-shifts-atm (Var x) c n
-    with c ≤ᵇ x
-... | true = Var (n Data.Nat.+ x)
-... | false = Var x
+shifts-atm (Var x) c n = Var (shifts-var x c n)
 
 shifts-ilexp : IL-Exp → ℕ → ℕ → IL-Exp
 shifts-ilexp (Atom atm) c n = Atom (shifts-atm atm c n)
 shifts-ilexp Read c n = Read
-shifts-ilexp (Sub a₁ a₂) c n = Sub (shifts-atm a₁ c n) (shifts-atm a₂ c n)
-shifts-ilexp (Assign x e₁ e₂) c n = Assign (shifts-var x c n) (shifts-ilexp e₁ c n) (shifts-ilexp e₂ c n)
+shifts-ilexp (Sub a₁ a₂) c n =
+    Sub (shifts-atm a₁ c n) (shifts-atm a₂ c n)
+shifts-ilexp (Assign x e₁ e₂) c n =
+    Assign (shifts-var x c n) (shifts-ilexp e₁ c n) (shifts-ilexp e₂ c n)
 
 -- Lift Locals hoists all the Let's to the top, leaving in their place assignments.
 --   let x = e₁ in e₂
@@ -170,9 +169,12 @@ data CExp : Set where
   Read : CExp
   Sub : Atm → Atm → CExp
 
-data CTail : Set where
-  Return : CExp → CTail
-  Let : CExp → CTail → CTail
+data CStmt : Set where
+  Return : CExp → CStmt
+  Assign : Id → CExp → CStmt → CStmt
+
+data CProg : Set where
+  Program : ℕ → CStmt → CProg
 
 interp-CExp : CExp → Env ℤ → Reader ℤ
 interp-CExp (Atom atm) ρ = try (interp-atm atm ρ)
@@ -182,77 +184,38 @@ interp-CExp (Sub a₁ a₂) ρ =
   λ v₁ → try (interp-atm a₂ ρ) then
   λ v₂ → return (Data.Integer._-_ v₁ v₂)
 
-interp-tail : CTail → Env ℤ → Reader ℤ
-interp-tail (Return e) ρ = interp-CExp e ρ
-interp-tail (Let e t) ρ =
-  (interp-CExp e ρ) then
-  λ v₁ → interp-tail t (v₁ ∷ ρ)
+data _⊢ᶜ_⇓_⊣_ : StateIL → CStmt → ℤ → StateIL → Set where
+  ⇓return : ∀{s s' ρ e v}
+     → interp-CExp e ρ s ≡ just (v , s')
+     → (s , ρ) ⊢ᶜ Return e ⇓ v ⊣ (s' , ρ)
+  ⇓assign : ∀{s ρ s′ sρ″ x e₁ e₂ v₁ v₂}
+     → interp-CExp e₁ ρ s ≡ just (v₁ , s′)
+     → (s′ , update ρ x v₁) ⊢ᶜ e₂  ⇓ v₂ ⊣ sρ″ 
+     → (s , ρ) ⊢ᶜ Assign x e₁ e₂ ⇓ v₂ ⊣ sρ″ 
 
-interp-CVar : CTail → Inputs → Maybe ℤ
-interp-CVar t s = run (interp-tail t []) s
-
-shift-exp : CExp → ℕ → CExp
-shift-exp (Atom atm) c = Atom (shift-atm atm c)
-shift-exp Read c = Read
-shift-exp (Sub a₁ a₂) c = Sub (shift-atm a₁ c) (shift-atm a₂ c)
-
-shift-tail : CTail → ℕ → CTail
-shift-tail (Return e) c = Return (shift-exp e c)
-shift-tail (Let e t) c = Let (shift-exp e c) (shift-tail t (suc c))
+interp-prog : CProg → Inputs → ℤ → Set
+interp-prog (Program n st) s v =
+    Σ[ sρ′ ∈ Inputs × Env ℤ ] (s , (replicate n 0ℤ)) ⊢ᶜ st ⇓ v ⊣ sρ′ 
 
 ----------------- Explicate Control ----------------------------
 
-explicate-let : Mon → CTail → CTail
-explicate : Mon → CTail
+explicate-assign : Id → IL-Exp → CStmt → CStmt
+explicate-tail : IL-Exp → CStmt
 
-explicate-let (Atom x) rest = Let (Atom x) rest  
-explicate-let Read rest = Let Read rest
-explicate-let (Sub a₁ a₂) rest = Let (Sub a₁ a₂) rest
-explicate-let (Let m₁ m₂) rest =
-  -- (Let (Let m₁ m₂) rest) ==> (Let m₁ (Let m₂ rest))
-  let rest' = explicate-let m₂ (shift-tail rest 1) in
-  explicate-let m₁ rest'
+explicate-assign x (Atom a) rest = Assign x (Atom a) rest  
+explicate-assign x Read rest = Assign x Read rest
+explicate-assign x (Sub a₁ a₂) rest = Assign x (Sub a₁ a₂) rest
+explicate-assign x (Assign y e₁ e₂) rest =
+    explicate-assign y e₁ (explicate-assign x e₂ rest)
+    
+explicate-tail (Atom a) = Return (Atom a)
+explicate-tail Read = Return Read
+explicate-tail (Sub a₁ a₂) = Return (Sub a₁ a₂)
+explicate-tail (Assign x e₁ e₂) =
+    explicate-assign x e₁ (explicate-tail e₂)
 
-explicate (Atom x) = Return (Atom x)
-explicate Read = Return Read
-explicate (Sub a₁ a₂) = Return (Sub a₁ a₂)
-explicate (Let m₁ m₂) = explicate-let m₁ (explicate m₂)
-
------------------ Definition of CVar2 ----------------------------
-
-data CStmt : Set where
-  Return : CExp → CStmt
-  Assign : Id → CExp → CStmt → CStmt
-
-data CProg : Set where
-  Program : ℕ → CStmt → CProg
-
-interp-stmt : CStmt → Env ℤ → Reader ℤ
-interp-stmt (Return e) ρ = interp-CExp e ρ
-interp-stmt (Assign x e s) ρ =
-  (interp-CExp e ρ) then
-  (λ v → interp-stmt s (update ρ x v))
-
-interp-prog : CProg → Inputs → Maybe ℤ
-interp-prog (Program n is) s = run (interp-stmt is (replicate n 0ℤ)) s
-
------------------ Lower Lets (Explicate Part 2) -------------------
-
-shifts-exp : CExp → ℕ → ℕ → CExp
-shifts-exp (Atom atm) c n = Atom (shifts-atm atm c n)
-shifts-exp Read c n = Read
-shifts-exp (Sub a₁ a₂) c n = Sub (shifts-atm a₁ c n) (shifts-atm a₂ c n)
-
-lower-tail : CTail → CStmt × ℕ
-lower-tail (Return e) = Return e , 0
-lower-tail (Let e t)
-    with lower-tail t
-... | s , n = Assign n (shifts-exp e 0 (suc n)) s , suc n
-
-lower-lets : CTail → CProg
-lower-lets t
-    with lower-tail t
-... | s , n = Program n s
+explicate : IL-Prog → CProg
+explicate (Program n e) = Program n (explicate-tail e)
 
 ----------------- Definition of X86Var ----------------------------
 

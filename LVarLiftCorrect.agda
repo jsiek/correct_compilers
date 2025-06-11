@@ -55,8 +55,8 @@ lift-locals-mon-correct (Let m₁ m₂) e s s′ v ρ₁ ρ₂ n im lm lρ₁
     with lift-locals-mon-correct m₁ e₁ s s₁ v₁ ρ₁₂ ρ₂ (length ρ₁₂) im1 lm1 refl
 ... | ρ′₁₂ , e₁⇓v₁ , lρ′₁₂
 --e₁⇓v₁ : (s , ρ₁₂ ++ ρ₂) ⊢ e₁ ⇓ v₁ ⊣ (s₁ , ρ′₁₂ ++ ρ₂)
-    with ⇓shifts {ρ₁ = []}{[]}{ρ₂ = ρ₁₁ ++ [ v′ ]}{ρ₃ = ρ₁₂ ++ ρ₂} e₁⇓v₁
-... | ρ′₁₁ , se1⇓v₁ , refl , lρ′₁₁
+    with ⇓shifts {ρ₁ = []}{[]}{ρ₂ = ρ₁₁ ++ [ v′ ]}{ρ₃ = ρ₁₂ ++ ρ₂} e₁⇓v₁ refl
+... | ρ′₁₁ , se1⇓v₁ , lρ′₁₁
     rewrite (++-assoc (ρ₁₁ ++ v′ ∷ []) ρ₁₂ ρ₂)
     | length-++ ρ₁₁ {v′ ∷ []} | +-comm (length ρ₁₁) 1
 -- se1⇓v₁ : (s , ρ₁₁ ++ [ v′ ] ++ ρ₁₂ ++ ρ₂) ⊢
@@ -77,8 +77,8 @@ lift-locals-mon-correct (Let m₁ m₂) e s s′ v ρ₁ ρ₂ n im lm lρ₁
     with lift-locals-mon-correct m₂ e₂ s₁ s′ v ρ″₁₁ (v₁ ∷ ρ₂) (length ρ″₁₁) im2 lm2 refl
 ... | ρ‴ , e₂⇓v₂ , lρ‴
 --e₂⇓v₂  : (s₁ , ρ″₁₁ ++ v₁ ∷ ρ₂) ⊢ e₂ ⇓ v ⊣ (s′ , ρ‴ ++ v₁ ∷ ρ₂)
-    with ⇓shifts {ρ₁ = ρ″₁₁}{ρ‴}{ρ₂ = ρ″₁₂}{ρ₃ = v₁ ∷ ρ₂} e₂⇓v₂
-... | ρ₄ , se2⇓v₂ , eq11 , lρ₄        
+    with ⇓shifts {ρ₁ = ρ″₁₁}{ρ‴}{ρ₂ = ρ″₁₂}{ρ₃ = v₁ ∷ ρ₂} e₂⇓v₂ (sym lρ‴)
+... | ρ₄ , se2⇓v₂ , lρ₄        
     rewrite sym (++-assoc ρ″₁₁ ρ″₁₂ (v₁ ∷ ρ₂))
     | sym (update-++-+ (ρ″₁₁ ++ ρ″₁₂) (v″ ∷ ρ₂) 0 v₁)
     | sym (++-assoc ρ₄ [ v₁ ] ρ₂)
