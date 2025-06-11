@@ -7,10 +7,10 @@ open import Data.Nat.Properties
 open import Data.Product
 open import Data.Integer using (ℤ; -_; _-_; 0ℤ)
 open import Data.List
---open import Data.List.Properties using (++-assoc)
+open import Data.List.Properties -- using (++-assoc)
 open import Data.Maybe
 open import Relation.Binary.PropositionalEquality
-   using (_≡_; refl; trans; sym; cong; cong-app)
+   using (_≡_; refl; trans; sym; cong; cong-app; cong₂)
 open import Agda.Builtin.Bool
 open import Relation.Nullary.Negation.Core using (¬_)
 
@@ -190,6 +190,27 @@ cons-++ : ∀ {A : Set}(x : A)(xs ys zs : List A)
   → x ∷ xs ≡ zs
   → x ∷ xs ++ ys ≡ zs ++ ys
 cons-++ x xs ys zs refl = refl
+
+replicate-+ : ∀ {A : Set} (m n : ℕ) (v : A)
+  → replicate (m + n) v ≡ replicate m v ++ replicate n v
+replicate-+ zero n v = refl
+replicate-+ (suc m) n v rewrite replicate-+ m n v = refl
+
+suc-i-j : ∀ (i j : ℕ)
+    → suc (i + j) ≡ j + 1 + i
+suc-i-j i j
+  rewrite +-comm i j | +-comm j 1 = refl
+
+length≡++ : ∀{A : Set}{xs xs′ ys ys′ : List A}
+  → length xs ≡ length xs′
+  → xs ++ ys ≡ xs′ ++ ys′
+  → xs ≡ xs′ × ys ≡ ys′
+length≡++ {A} {[]} {[]} refl refl = refl , refl
+length≡++ {A} {x ∷ xs} {x₁ ∷ xs′}{ys}{ys′} len app≡
+    with ∷-injective app≡
+... | refl , eq =
+  let IH = length≡++{A}{xs}{xs′}{ys}{ys′} (suc-injective len)  eq in
+  (cong₂ _∷_ refl (proj₁ IH) ) , proj₂ IH
 
 postulate
   extensionality : ∀ {A B : Set} {f g : A → B}

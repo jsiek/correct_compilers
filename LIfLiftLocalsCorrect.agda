@@ -23,6 +23,7 @@ open import LIf
 open import LMonIf
 open import IL1
 open import LMonLiftLocals
+open import State (Inputs × Env Value)
 
 --------------- Proof of correctness for Lift Locals -------------------
 
@@ -33,74 +34,136 @@ interp-shifts-atm (Num x) ρ₁ ρ₂ ρ₃ = refl
 interp-shifts-atm (Atm.Bool x) ρ₁ ρ₂ ρ₃ = refl
 interp-shifts-atm (Var x) ρ₁ ρ₂ ρ₃ = nth-++-shifts-var ρ₁ ρ₂ ρ₃ x
 
+_,_⊢_≅_ : ℕ → ℕ → Maybe (Value × Inputs × Env Value) → Maybe (Value × Inputs × Env Value) → Set
+n , m ⊢ just (v , s , ρ) ≅ just (v' , s' , ρ') = v ≡ v' × s ≡ s'
+       × take n ρ ≡ take n ρ' × drop n ρ ≡ drop (n + m) ρ'
+n , m ⊢ just x ≅ nothing = ⊥
+n , m ⊢ nothing ≅ just x = ⊥
+n , m ⊢ nothing ≅ nothing = ⊤
+
 interp-shifts-il1-exp : ∀ (e : IL1-Exp) (s : Inputs) (ρ₁ ρ₂ ρ₃ : Env Value)
-  → interp-il1-exp (shifts-il1-exp e (length ρ₁) (length ρ₂)) (s , ρ₁ ++ ρ₂ ++ ρ₃)
-  ≡ interp-il1-exp e (s , ρ₁ ++ ρ₃)
-interp-shifts-il1-exp (Atom a) s ρ₁ ρ₂ ρ₃
---     with interp-atm a (ρ₁ ++ ρ₃)
--- ... | nothing = {!!}
--- ... | just xx
-    rewrite interp-shifts-atm a ρ₁ ρ₂ ρ₃
-    = {!!}
+  →  (length ρ₁) , (length ρ₂)
+    ⊢ interp-il1-exp (shifts-il1-exp e (length ρ₁) (length ρ₂)) (s , ρ₁ ++ ρ₂ ++ ρ₃)
+    ≅ interp-il1-exp e (s , ρ₁ ++ ρ₃)
+interp-shifts-il1-exp e s ρ₁ ρ₂ ρ₃ = {!!}
 
-    -- = {!!}
-interp-shifts-il1-exp Read s ρ₁ ρ₂ ρ₃ = {!!}
-interp-shifts-il1-exp (Uni op a) s ρ₁ ρ₂ ρ₃
-    rewrite interp-shifts-atm a ρ₁ ρ₂ ρ₃
-    = {!!}
-interp-shifts-il1-exp (Bin op a₁ a₂) s ρ₁ ρ₂ ρ₃
-    rewrite interp-shifts-atm a₁ ρ₁ ρ₂ ρ₃
-    | interp-shifts-atm a₂ ρ₁ ρ₂ ρ₃
-    = {!!}
-interp-shifts-il1-exp (Assign x e₁ e₂) s ρ₁ ρ₂ ρ₃
-    rewrite nth-++-shifts-var ρ₁ ρ₂ ρ₃ x
-    | interp-shifts-il1-exp e₁ s ρ₁ ρ₂ ρ₃
-    with interp-il1-exp e₁ (s , ρ₁ ++ ρ₃)
-... | nothing = refl
-... | just (v₁ , s₁)
-    with length ρ₁ ≤ᵇ x in lt
-... | true
-    with m≤n⇒-+ (length ρ₁) x (≤ᵇ⇒≤ (length ρ₁) x (eq-true-top lt))
-... | i , refl
-    rewrite update-++-+ ρ₁ ρ₃ i v₁
-    | sym (+-assoc (length ρ₂) (length ρ₁) i)
-    | +-comm (length ρ₂) (length ρ₁)
-    | (+-assoc (length ρ₁) (length ρ₂) i)
-    | update-++-+ ρ₁ (ρ₂ ++ ρ₃) (length ρ₂ + i) v₁
-    | update-++-+ ρ₂ ρ₃ i v₁
-    | interp-shifts-il1-exp e₂ s ρ₁ ρ₂ (update ρ₃ i v₁)
-    = {!!}
-interp-shifts-il1-exp (Assign x e₁ e₂) s ρ₁ ρ₂ ρ₃ | just (v₁ , s₁) | false
-    rewrite update-++-< ρ₁ ρ₃ x v₁ (≰⇒> λ x₁ → (eq-false-not-top lt) (≤⇒≤ᵇ x₁))
-    | update-++-< ρ₁ (ρ₂ ++ ρ₃) x v₁ (≰⇒> λ x₁ → (eq-false-not-top lt) (≤⇒≤ᵇ x₁))
-    with interp-shifts-il1-exp e₂ s (update ρ₁ x v₁) ρ₂ ρ₃
-... | IH2
-    rewrite update-length ρ₁ x v₁
-    | IH2
-    = {!!}
+-- interp-shifts-il1-exp : ∀ (e : IL1-Exp) (s : Inputs) (ρ₁ ρ₂ ρ₃ : Env Value)
+--   → interp-il1-exp (shifts-il1-exp e (length ρ₁) (length ρ₂)) (s , ρ₁ ++ ρ₂ ++ ρ₃)
+--   ≡ interp-il1-exp e (s , ρ₁ ++ ρ₃)
+-- interp-shifts-il1-exp (Atom a) s ρ₁ ρ₂ ρ₃
+-- --     with interp-atm a (ρ₁ ++ ρ₃)
+-- -- ... | nothing = {!!}
+-- -- ... | just xx
+--     rewrite interp-shifts-atm a ρ₁ ρ₂ ρ₃
+--     = {!!}
+
+--     -- = {!!}
+-- interp-shifts-il1-exp Read s ρ₁ ρ₂ ρ₃ = {!!}
+-- interp-shifts-il1-exp (Uni op a) s ρ₁ ρ₂ ρ₃
+--     rewrite interp-shifts-atm a ρ₁ ρ₂ ρ₃
+--     = {!!}
+-- interp-shifts-il1-exp (Bin op a₁ a₂) s ρ₁ ρ₂ ρ₃
+--     rewrite interp-shifts-atm a₁ ρ₁ ρ₂ ρ₃
+--     | interp-shifts-atm a₂ ρ₁ ρ₂ ρ₃
+--     = {!!}
+-- interp-shifts-il1-exp (Assign x e₁ e₂) s ρ₁ ρ₂ ρ₃
+--     rewrite nth-++-shifts-var ρ₁ ρ₂ ρ₃ x
+--     | interp-shifts-il1-exp e₁ s ρ₁ ρ₂ ρ₃
+--     with interp-il1-exp e₁ (s , ρ₁ ++ ρ₃)
+-- ... | nothing = refl
+-- ... | just (v₁ , s₁)
+--     with length ρ₁ ≤ᵇ x in lt
+-- ... | true
+--     with m≤n⇒-+ (length ρ₁) x (≤ᵇ⇒≤ (length ρ₁) x (eq-true-top lt))
+-- ... | i , refl
+--     rewrite update-++-+ ρ₁ ρ₃ i v₁
+--     | sym (+-assoc (length ρ₂) (length ρ₁) i)
+--     | +-comm (length ρ₂) (length ρ₁)
+--     | (+-assoc (length ρ₁) (length ρ₂) i)
+--     | update-++-+ ρ₁ (ρ₂ ++ ρ₃) (length ρ₂ + i) v₁
+--     | update-++-+ ρ₂ ρ₃ i v₁
+--     | interp-shifts-il1-exp e₂ s ρ₁ ρ₂ (update ρ₃ i v₁)
+--     = {!!}
+-- interp-shifts-il1-exp (Assign x e₁ e₂) s ρ₁ ρ₂ ρ₃ | just (v₁ , s₁) | false
+--     rewrite update-++-< ρ₁ ρ₃ x v₁ (≰⇒> λ x₁ → (eq-false-not-top lt) (≤⇒≤ᵇ x₁))
+--     | update-++-< ρ₁ (ρ₂ ++ ρ₃) x v₁ (≰⇒> λ x₁ → (eq-false-not-top lt) (≤⇒≤ᵇ x₁))
+--     with interp-shifts-il1-exp e₂ s (update ρ₁ x v₁) ρ₂ ρ₃
+-- ... | IH2
+--     rewrite update-length ρ₁ x v₁
+--     | IH2
+--     = {!!}
     
-interp-shifts-il1-exp (If e₁ e₂ e₃) s ρ₁ ρ₂ ρ₃
-    rewrite interp-shifts-il1-exp e₁ s ρ₁ ρ₂ ρ₃
-    with interp-il1-exp e₁ (s , ρ₁ ++ ρ₃)
-... | nothing = refl
-... | just (Int n , s₁) = refl
-... | just (Bool true , s₁)
-    rewrite interp-shifts-il1-exp e₂ s ρ₁ ρ₂ ρ₃
-    = {!!}
-... | just (Bool false , s₁)
-    rewrite interp-shifts-il1-exp e₃ s ρ₁ ρ₂ ρ₃
-    = {!!}
+-- interp-shifts-il1-exp (If e₁ e₂ e₃) s ρ₁ ρ₂ ρ₃
+--     rewrite interp-shifts-il1-exp e₁ s ρ₁ ρ₂ ρ₃
+--     with interp-il1-exp e₁ (s , ρ₁ ++ ρ₃)
+-- ... | nothing = refl
+-- ... | just (Int n , s₁) = refl
+-- ... | just (Bool true , s₁)
+--     rewrite interp-shifts-il1-exp e₂ s ρ₁ ρ₂ ρ₃
+--     = {!!}
+-- ... | just (Bool false , s₁)
+--     rewrite interp-shifts-il1-exp e₃ s ρ₁ ρ₂ ρ₃
+--     = {!!}
         
--- suc-i-j : ∀ (i j : ℕ)
---     → suc (i + j) ≡ j + 1 + i
--- suc-i-j i j
---   rewrite +-comm i j | +-comm j 1 = refl
+-- Need to relate the result of interp-mon and interp-il1-exp in the context of ρ.
 
--- -- ρ₁ is for the bound variables in m, which become free and are initialized to 0
--- -- ρ₂ is for the free variables in m
--- lift-mon-correct-aux : ∀ (m : Mon) (ρ₁ ρ₂ : Env Value)
---   → proj₁ (lift-locals-mon m) ≡ length ρ₁
---   → interp-mon m ρ₂ ≡ interp-il1-exp (proj₂ (lift-locals-mon m)) (ρ₁ ++ ρ₂) 
+_,_⊢_≈_ : Env Value → ℕ → Maybe (Value × Inputs) → Maybe (Value × Inputs × Env Value) → Set
+ρ , n ⊢ x ≈ y =
+  (x ≡ nothing × y ≡ nothing)
+  ⊎ (Σ[ ρ′ ∈ Env Value ] Σ[ s ∈ Inputs ] Σ[ v ∈ Value ]
+     x ≡ just (v , s) × y ≡ just (v , s , ρ′ ++ ρ) × n ≡ length ρ′)
+
+-- ρ₁ is for the bound variables in m, which become free and are initialized to 0
+-- ρ₂ is for the free variables in m
+lift-mon-correct-aux : ∀ (m : Mon) (ρ₁ ρ₂ : Env Value) (s : Inputs)
+  → proj₁ (lift-locals-mon m) ≡ length ρ₁
+  → ρ₂ , proj₁ (lift-locals-mon m)
+    ⊢ interp-mon m ρ₂ s ≈ interp-il1-exp (proj₂ (lift-locals-mon m)) (s , ρ₁ ++ ρ₂)
+lift-mon-correct-aux (Atom a) [] ρ₂ s lift-m
+    with interp-atm a ρ₂
+... | nothing = inj₁ (refl , refl)
+... | just v = inj₂ ([] , s , v , refl , refl , refl)
+lift-mon-correct-aux Read [] ρ₂ (i , f) lift-m =
+  inj₂ ([] , (suc i , f) , Int (f i) , refl , refl , refl)
+lift-mon-correct-aux (Uni op a) [] ρ₂ s lift-m
+    with interp-atm a ρ₂
+... | nothing = inj₁ (refl , refl)
+... | just v
+    with uniop op v
+... | nothing = inj₁ (refl , refl)
+... | just v′ = inj₂ ([] , s , v′ , refl , refl , refl)
+lift-mon-correct-aux (Bin op a₁ a₂) [] ρ₂ s lift-m
+    with interp-atm a₁ ρ₂
+... | nothing = inj₁ (refl , refl)
+... | just v₁
+    with interp-atm a₂ ρ₂
+... | nothing = inj₁ (refl , refl)
+... | just v₂
+    with binop op v₁ v₂
+... | nothing = inj₁ (refl , refl)
+... | just v′ = inj₂ ([] , s , v′ , refl , refl , refl)
+lift-mon-correct-aux (Let m₁ m₂) ρ₁ ρ₂ s lift-m
+    with lift-locals-mon m₁ in l1
+... | i , e₁
+    with lift-locals-mon m₂ in l2
+... | j , e₂
+    with ++-length ρ₁ (j + 1) i (trans (sym lift-m) (suc-i-j i j))
+... | ρ′₁ , ρ₁₂ , refl , ρ′₁j1 , refl
+    with ++-length ρ′₁ j 1 ρ′₁j1
+... | ρ₁₁ , v′ ∷ [] , refl , refl , refl
+    with interp-shifts-il1-exp e₁ s [] (ρ₁₁ ++ [ v′ ]) (ρ₁₂ ++ ρ₂)
+... | is1
+    with interp-il1-exp (shifts-il1-exp e₁ 0 (suc (foldr (λ _ → suc) 0 ρ₁₁)))
+          (s , ((ρ₁₁ ++ v′ ∷ []) ++ ρ₁₂) ++ ρ₂) in is-e1
+        | interp-il1-exp e₁ (s , ρ₁₂ ++ ρ₂) in i-e1
+... | nothing | nothing = {!!}
+... | nothing | just xx = {!!}
+... | just xx | nothing = {!!}
+... | just (v , s′ , ρ′) | just (v′ , s″ , ρ″)
+    = {!!}
+ 
+lift-mon-correct-aux (If m₁ m₂ m₃) ρ₁ ρ₂ s lift-m = {!!}
+
 -- lift-mon-correct-aux (Atom a) [] ρ₂ prem = refl
 -- lift-mon-correct-aux Read ρ₁ ρ₂ prem = refl
 -- lift-mon-correct-aux (Uni op a) [] ρ₂ prem = refl
@@ -207,16 +270,23 @@ interp-shifts-il1-exp (If e₁ e₂ e₃) s ρ₁ ρ₂ ρ₃
 --         rewrite l3 | sym (IH3 refl)
 --         = refl
 
--- lift-mon-correct : ∀ (m : Mon) (ρ : Env Value)
---   → proj₁ (lift-locals-mon m) ≡ length ρ
---   → interp-mon m [] ≡ interp-il1-exp (proj₂ (lift-locals-mon m)) ρ
--- lift-mon-correct m ρ prem
---   rewrite lift-mon-correct-aux m ρ [] prem
---   | ++-identityʳ ρ = refl
-
--- lift-locals-correct : ∀ (m : Mon) (s : Inputs)
---   → interp-IL1 (lift-locals m) s ≡ interp-LMonIf m s
--- lift-locals-correct m s
---   rewrite lift-mon-correct m (replicate (lift-locals-mon m .proj₁) (Int 0ℤ))
---               (sym (length-replicate (proj₁ (lift-locals-mon m))))
---   = refl
+lift-mon-correct : ∀ (m : Mon) (ρ : Env Value) (s : Inputs)
+  → proj₁ (lift-locals-mon m) ≡ length ρ
+  → [] , proj₁ (lift-locals-mon m)
+    ⊢ interp-mon m [] s ≈ interp-il1-exp (proj₂ (lift-locals-mon m)) (s , ρ)
+lift-mon-correct m ρ s prem
+    with lift-mon-correct-aux m ρ [] s prem
+... | lmc
+    rewrite ++-identityʳ ρ = lmc
+  
+lift-locals-correct : ∀ (m : Mon) (s : Inputs)
+  → interp-IL1 (lift-locals m) s ≡ interp-LMonIf m s
+lift-locals-correct m s
+    with lift-mon-correct m (replicate (lift-locals-mon m .proj₁) (Int 0ℤ)) s
+... | lmc
+    rewrite length-replicate (lift-locals-mon m .proj₁) {Int (ℤ.pos 0)}
+    with lmc refl
+... | inj₁ (im-noth , ilm-noth)
+    rewrite im-noth | ilm-noth = refl
+... | inj₂ (ρ′ , s , v , im-just , ilm-just , eq)
+    rewrite im-just | ilm-just = refl

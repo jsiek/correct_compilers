@@ -1,7 +1,7 @@
 module LVar where
 
 open import Agda.Builtin.Unit
-open import Data.Nat using (ℕ; zero; suc; _≤ᵇ_; _<_)
+open import Data.Nat using (ℕ; zero; suc; _≤ᵇ_; _<_; _+_)
 open import Data.Nat.Properties
 open import Data.Product
 open import Data.Integer using (ℤ; -_; _-_; 0ℤ)
@@ -59,7 +59,7 @@ interp-mon Read ρ = read
 interp-mon (Sub a₁ a₂) ρ =
   (try (interp-atm a₁ ρ)) then
   λ v₁ → try (interp-atm a₂ ρ) then
-  λ v₂ → return (Data.Integer._-_ v₁ v₂)
+  λ v₂ → return (v₁ - v₂)
 interp-mon (Let e₁ e₂) ρ =
   (interp-mon e₁ ρ) then
   λ v₁ → interp-mon e₂ (v₁ ∷ ρ)
@@ -87,6 +87,81 @@ rco (Sub e₁ e₂) =
    (Let (shift-mon (rco e₂) zero) (Sub (Var (suc (zero))) (Var zero)))
 rco (Var i) = Atom (Var i)
 rco (Let e₁ e₂) = Let (rco e₁) (rco e₂)
+
+----------------- Definition of IL ----------------------------
+
+data IL-Exp : Set where
+  Atom : Atm → IL-Exp
+  Read : IL-Exp
+  Sub : Atm → Atm → IL-Exp
+  Assign : Id → IL-Exp → IL-Exp → IL-Exp
+  
+data IL-Prog : Set where
+  Program : ℕ → IL-Exp → IL-Prog
+
+StateIL : Set
+StateIL = Inputs × List ℤ
+
+data _⊢_⇓_⊣_ : StateIL → IL-Exp → ℤ → StateIL → Set where
+  ⇓atom : ∀{s ρ a v}
+     → interp-atm a ρ ≡ just v
+     → (s , ρ) ⊢ Atom a ⇓ v ⊣ (s , ρ)
+  ⇓read : ∀{i f ρ}
+     → ((i , f) , ρ) ⊢ Read ⇓ (f i) ⊣ ((suc i , f) , ρ)
+  ⇓sub : ∀{s ρ a₁ a₂ n₁ n₂}
+     → interp-atm a₁ ρ ≡ just n₁
+     → interp-atm a₂ ρ ≡ just n₂
+     → (s , ρ) ⊢ Sub a₁ a₂ ⇓ n₁ - n₂ ⊣ (s , ρ)
+  ⇓assign : ∀{sρ s′ ρ′ sρ″ x e₁ e₂ n₁ n₂}
+     → sρ ⊢ e₁ ⇓ n₁ ⊣ (s′ , ρ′)
+     → (s′ , update ρ′ x n₁) ⊢ e₂  ⇓ n₂ ⊣ sρ″ 
+     → sρ ⊢ Assign x e₁ e₂ ⇓ n₂ ⊣ sρ″ 
+
+interp-ilprog : IL-Prog → Inputs → ℤ → Set
+interp-ilprog (Program n e) s v =
+    Σ[ sρ′ ∈ Inputs × Env ℤ ] (s , (replicate n 0ℤ)) ⊢ e ⇓ v ⊣ sρ′ 
+
+----------------- Lift Locals ----------------------------
+
+shifts-atm : Atm → ℕ → ℕ → Atm
+shifts-atm (Num x) c n = Num x
+shifts-atm (Var x) c n
+    with c ≤ᵇ x
+... | true = Var (n Data.Nat.+ x)
+... | false = Var x
+
+shifts-ilexp : IL-Exp → ℕ → ℕ → IL-Exp
+shifts-ilexp (Atom atm) c n = Atom (shifts-atm atm c n)
+shifts-ilexp Read c n = Read
+shifts-ilexp (Sub a₁ a₂) c n = Sub (shifts-atm a₁ c n) (shifts-atm a₂ c n)
+shifts-ilexp (Assign x e₁ e₂) c n = Assign (shifts-var x c n) (shifts-ilexp e₁ c n) (shifts-ilexp e₂ c n)
+
+-- Lift Locals hoists all the Let's to the top, leaving in their place assignments.
+--   let x = e₁ in e₂
+--   ==>
+--   let x = 0 in { x := e′₁; e′₂ }
+--
+--
+--   Returns the number of variables bound by the let's around the expression:
+--   let y₁=0,...,yᵢ=0 in m
+--   is represented as
+--   i , m
+
+lift-locals-mon : Mon → ℕ × IL-Exp
+lift-locals-mon (Atom a) = 0 , (Atom a)
+lift-locals-mon Read = 0 , Read
+lift-locals-mon (Sub a₁ a₂) = 0 , (Sub a₁ a₂)
+lift-locals-mon (Let m₁ m₂)
+    with lift-locals-mon m₁
+... | i , e₁
+    with lift-locals-mon m₂
+... | j , e₂
+    = (suc (i + j)) , Assign (i + j) (shifts-ilexp e₁ 0 (suc j)) (shifts-ilexp e₂ j i)
+
+lift-locals : Mon → IL-Prog
+lift-locals m
+    with lift-locals-mon m
+... | n , e = Program n e    
 
 ----------------- Definition of CVar ----------------------------
 
@@ -162,13 +237,6 @@ interp-prog : CProg → Inputs → Maybe ℤ
 interp-prog (Program n is) s = run (interp-stmt is (replicate n 0ℤ)) s
 
 ----------------- Lower Lets (Explicate Part 2) -------------------
-
-shifts-atm : Atm → ℕ → ℕ → Atm
-shifts-atm (Num x) c n = Num x
-shifts-atm (Var x) c n
-    with c ≤ᵇ x
-... | true = Var (n Data.Nat.+ x)
-... | false = Var x
 
 shifts-exp : CExp → ℕ → ℕ → CExp
 shifts-exp (Atom atm) c n = Atom (shifts-atm atm c n)
