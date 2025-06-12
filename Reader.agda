@@ -31,8 +31,8 @@ read-int inj (i , f) = just (inj (f i) , (suc i , f))
 return : ∀{A : Set} → A → Reader A
 return a s = just (a , s)
 
-timeout : ∀{A : Set} → Reader A
-timeout s = nothing
+error : ∀{A : Set} → Reader A
+error s = nothing
 
 try : ∀{A : Set} → Maybe A → Reader A
 try (just x) s = just (x , s)
@@ -49,11 +49,4 @@ run r s
     with r s
 ... | nothing = nothing
 ... | just (v , s) = just v
-
-then-timeout : ∀ {A B : Set} (M : Reader A) (s : Inputs)
-  → (M then (λ v → timeout {B})) s ≡ timeout s
-then-timeout M s
-    with M s
-... | nothing = refl
-... | just (v , s') = refl
 
