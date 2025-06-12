@@ -6,7 +6,6 @@ open import Data.Integer using (ℤ; _-_; 0ℤ)
 open import Data.List using (replicate)
 open import Data.Maybe
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
-
 open import Reader
 open import Utilities
 open import LVar

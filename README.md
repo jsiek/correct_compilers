@@ -2,6 +2,9 @@
 
 Experiments in proving compiler correctness
 
+The main correctness theorem for LVar is in
+
+    LVarCorrect.agda
 
 LVar (Exp)           (LVar.agda)
   |
@@ -20,5 +23,4 @@ CVar (CExp, CStmt, CProg)
   | select-inst      (LVarSelectCorrect.agda)
   V
 X86Var (Arg, Inst)
-
 

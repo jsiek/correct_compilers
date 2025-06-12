@@ -1,21 +1,13 @@
 module LVarLiftCorrect where
 
-open import Agda.Builtin.Unit
-open import Data.Empty using (⊥; ⊥-elim)
-open import Data.Bool using ()
 open import Data.Nat using (ℕ; zero; suc; _<_; _≤_; _≤ᵇ_; _∸_; _+_; s≤s)
 open import Data.Nat.Properties
 open import Data.Product
-open import Data.Sum
-open import Data.Integer using (ℤ; -_; _-_; 0ℤ)
+open import Data.Integer using (ℤ; _-_; 0ℤ)
 open import Data.List
 open import Data.List.Properties using (++-assoc; length-replicate; ++-identityʳ; length-++)
 open import Data.Maybe
-open import Relation.Binary.PropositionalEquality
-   using (_≡_; refl; trans; sym; cong; cong-app)
-open import Agda.Builtin.Bool
-open import Relation.Nullary.Negation.Core using (¬_; contradiction)
-open import Function.Base using (case_of_; case_returning_of_)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; sym)
 
 open import Reader
 open import Utilities
@@ -54,14 +46,10 @@ lift-locals-mon-correct (Let m₁ m₂) e s s′ v ρ₁ ρ₂ n im lm lρ₁
 ... | ρ₁₁ , v′ ∷ [] , refl , refl , refl
     with lift-locals-mon-correct m₁ e₁ s s₁ v₁ ρ₁₂ ρ₂ (length ρ₁₂) im1 lm1 refl
 ... | ρ′₁₂ , e₁⇓v₁ , lρ′₁₂
---e₁⇓v₁ : (s , ρ₁₂ ++ ρ₂) ⊢ e₁ ⇓ v₁ ⊣ (s₁ , ρ′₁₂ ++ ρ₂)
     with ⇓shifts {ρ₁ = []}{[]}{ρ₂ = ρ₁₁ ++ [ v′ ]}{ρ₃ = ρ₁₂ ++ ρ₂} e₁⇓v₁ refl
 ... | ρ′₁₁ , se1⇓v₁ , lρ′₁₁
     rewrite (++-assoc (ρ₁₁ ++ v′ ∷ []) ρ₁₂ ρ₂)
     | length-++ ρ₁₁ {v′ ∷ []} | +-comm (length ρ₁₁) 1
--- se1⇓v₁ : (s , ρ₁₁ ++ [ v′ ] ++ ρ₁₂ ++ ρ₂) ⊢
---         shifts-ilexp e₁ 0 (length (ρ₁₁ ++ [ v′ ])) ⇓ v₁
---        ⊣ (s₁ , ρ′₁₁ ++ ρ′₁₂ ++ ρ₂)
     with ++-length (ρ′₁₁ ++ ρ′₁₂) (length ρ₁₁ + length ρ₁₂) 1
 ... | lenr11_r12 
     rewrite length-++ ρ′₁₁ {ρ′₁₂} | lρ′₁₂ | lρ′₁₁ | +-comm 1 (length ρ₁₁ + length ρ′₁₂)
@@ -76,7 +64,6 @@ lift-locals-mon-correct (Let m₁ m₂) e s s′ v ρ₁ ρ₂ n im lm lρ₁
     | sym (+-identityʳ (length (ρ″₁₁ ++ ρ″₁₂)))
     with lift-locals-mon-correct m₂ e₂ s₁ s′ v ρ″₁₁ (v₁ ∷ ρ₂) (length ρ″₁₁) im2 lm2 refl
 ... | ρ‴ , e₂⇓v₂ , lρ‴
---e₂⇓v₂  : (s₁ , ρ″₁₁ ++ v₁ ∷ ρ₂) ⊢ e₂ ⇓ v ⊣ (s′ , ρ‴ ++ v₁ ∷ ρ₂)
     with ⇓shifts {ρ₁ = ρ″₁₁}{ρ‴}{ρ₂ = ρ″₁₂}{ρ₃ = v₁ ∷ ρ₂} e₂⇓v₂ (sym lρ‴)
 ... | ρ₄ , se2⇓v₂ , lρ₄        
     rewrite sym (++-assoc ρ″₁₁ ρ″₁₂ (v₁ ∷ ρ₂))

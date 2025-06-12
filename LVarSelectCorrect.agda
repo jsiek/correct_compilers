@@ -45,33 +45,6 @@ to-arg-correct (Var x) ρ inputs regs
 ... | nothing = refl
 ... | just v = refl
 
-select-exp-OK : ∀ (e : CExp) (d : Dest) 
-  → DestOK d 1
-  → InstsOK (select-exp e d) 1
-select-exp-OK (Atom x) d d-ok = MovQOK d-ok , tt
-select-exp-OK Read d d-ok = ReadIntOK (RegOK (s≤s z≤n)) , MovQOK d-ok , tt
-select-exp-OK (Sub x x₁) d d-ok = MovQOK (RegOK (s≤s z≤n)) ,
-                                   SubQOK (RegOK (s≤s z≤n)) , MovQOK d-ok , tt
-
-select-++-OK : ∀ {is1 is2 : List Inst}
-  → InstsOK is1 1
-  → InstsOK is2 1
-  → InstsOK (is1 ++ is2) 1
-select-++-OK {[]} {is2} tt is2-ok = is2-ok
-select-++-OK {i ∷ is1} {is2} (i-ok , is1-ok) is2-ok = i-ok , select-++-OK is1-ok is2-ok
-
-select-stmt-OK : ∀ (st : CStmt)
-  → InstsOK (select-stmt st) 1
-select-stmt-OK (Return e) = select-exp-OK e (Reg rax) (RegOK (s≤s z≤n))
-select-stmt-OK (Assign x e st) =
-  let se-ok = select-exp-OK e (Var x) VarOK in
-  let sst-ok = select-stmt-OK st in
-  select-++-OK se-ok sst-ok
-
-select-inst-OK : ∀ (p : CProg)
-  → X86VarOK (select-inst p) 1
-select-inst-OK (Program n st) = select-stmt-OK st
-
 StateOK : StateX86 → Set
 StateOK (s , regs , ρ) = 0 < length regs
 
@@ -166,7 +139,8 @@ select-exp-correct (Sub a₁ a₂) ρ s s′ dest regs v ie regs-pos dest-ok
     len-up-up-pos x (RegOK lt) rewrite update-length (update regs 0 v₁) rax (v₁ - v₂)
        | update-length regs 0 v₁ = ≤-trans lt regs-pos
 
-    Goal : ∀ dest → DestOK dest 1 → wrote dest (v₁ - v₂) (s , regs , ρ) (write dest (v₁ - v₂) (s , update (update regs rax v₁) rax (v₁ - v₂) , ρ))
+    Goal : ∀ dest → DestOK dest 1 → wrote dest (v₁ - v₂) (s , regs , ρ)
+                                     (write dest (v₁ - v₂) (s , update (update regs rax v₁) rax (v₁ - v₂) , ρ))
     Goal (Var x) d-ok = refl , refl , trans (update-length (update regs rax v₁) rax (v₁ - v₂)) (update-length regs rax v₁)
     Goal (Reg x) d-ok = refl , nth-update (update (update regs rax v₁) rax (v₁ - v₂)) x (v₁ - v₂) (len-up-up-pos x d-ok) , refl ,
           trans (update-length (update (update regs rax v₁) rax (v₁ - v₂)) x (v₁ - v₂))
