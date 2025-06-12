@@ -3,9 +3,9 @@
 Experiments in proving compiler correctness
 
 
-LVar (Exp)     (LVar.agda)
+LVar (Exp)           (LVar.agda)
   |
-  | rco
+  | rco              (LVarRCOCorrect.agda)
   V
 LMonVar (Atm,Mon)
   |

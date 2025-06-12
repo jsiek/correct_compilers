@@ -303,3 +303,13 @@ select-stmt (Assign x e rest) = (select-exp e (Var x)) ++ (select-stmt rest)
 
 select-inst : CProg → X86Var
 select-inst (Program n s) = Program n (select-stmt s)
+
+----------------- Compile ----------------------------
+
+compile : Exp → X86Var
+compile e =
+  let m = rco e in
+  let il = lift-locals m in
+  let c = explicate il in
+  select-inst c
+  
