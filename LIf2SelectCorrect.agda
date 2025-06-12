@@ -149,7 +149,29 @@ select-exp-correct (Sub a₁ a₂) ρ s s′ dest regs v ie regs-pos dest-ok
     Goal (Reg x) d-ok = refl , nth-update (update (update regs rax (Int v₁)) rax (Int (v₁ - v₂))) x (Int (v₁ - v₂)) (len-up-up-pos x d-ok) , refl ,
           trans (update-length (update (update regs rax (Int v₁)) rax (Int (v₁ - v₂))) x (Int (v₁ - v₂)))
           (trans (update-length (update regs rax (Int v₁)) rax (Int (v₁ - v₂))) (update-length regs rax (Int v₁)))
-     
+select-exp-correct (Eq a₁ a₂) ρ s s′ dest regs v ie regs-pos dest-ok
+    with interp-atm a₁ ρ in ia₁
+... | just v₁
+    with interp-atm a₂ ρ in ia₂
+... | just v₂
+    with equal v₁ v₂ in e₁₂ | ie
+... | just v | refl =
+    let cmp : (s , regs , ρ) ⊢ CmpQ (to-arg a₁) (to-arg a₂) ⇓ (s , update regs rax v , ρ)
+        cmp = ⇓cmpq{a₁ = to-arg a₁}{to-arg a₂} itoa1 itoa2 e₁₂ in
+    let mov : (s , update regs rax v , ρ) ⊢ MovQ (Reg rax) dest ⇓ write dest v (s , update regs rax v , ρ)
+        mov = ⇓movq{Reg rax}{dest}{s , update regs rax v , ρ}{v} (nth-update regs rax v regs-pos) in
+
+    write dest v (s , update regs rax v , ρ) ,
+    ⇓cons cmp (⇓cons mov ⇓null) ,
+    wrote-write2 dest s regs (update regs rax v) ρ v (update-length regs rax v) dest-ok regs-pos
+
+    where
+    itoa1 : interp-arg (to-arg a₁) (s , regs , ρ) ≡ just v₁
+    itoa1 rewrite sym (to-arg-correct a₁ ρ s regs) = ia₁
+    
+    itoa2 : interp-arg (to-arg a₂) (s , regs , ρ) ≡ just v₂
+    itoa2 rewrite sym (to-arg-correct a₂ ρ s regs) = ia₂
+
 ⇓-++ : ∀{st1 st2 st3 : StateX86}{is1 is2 : List Inst}
   → st1 ⊩ is1 ⇓ st2
   → st2 ⊩ is2 ⇓ st3
