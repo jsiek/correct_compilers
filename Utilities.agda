@@ -212,6 +212,15 @@ length≡++ {A} {x ∷ xs} {x₁ ∷ xs′}{ys}{ys′} len app≡
   let IH = length≡++{A}{xs}{xs′}{ys}{ys′} (suc-injective len)  eq in
   (cong₂ _∷_ refl (proj₁ IH) ) , proj₂ IH
 
+len-lemma : ∀{A : Set} (xs ys : List A) (v : A)
+  → length (xs ++ v ∷ []) + length ys ≡ length xs + length ys + 1
+len-lemma xs ys v
+    rewrite length-++ xs {v ∷ []}
+    | +-assoc (length xs) 1 (length ys)
+    | +-comm 1 (length ys)
+    | +-assoc (length xs) (length ys) 1
+    = refl  
+
 postulate
   extensionality : ∀ {A B : Set} {f g : A → B}
     → (∀ (x : A) → f x ≡ g x)

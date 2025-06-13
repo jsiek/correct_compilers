@@ -8,7 +8,7 @@ open import Data.Integer using (ℤ; _-_; 0ℤ)
 open import Data.List
 open import Data.List.Properties using (++-assoc; length-replicate; ++-identityʳ; length-++)
 open import Data.Maybe
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; sym)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; sym; cong₂)
 
 open import Reader
 open import Utilities
@@ -53,20 +53,37 @@ lift-locals-mon-correct (If m₁ m₂ m₃) e s s″ v ρ₁ ρ₂ n im lm lρ�
 ... | j , e₂
     with lift-locals-mon m₃ in lm3 | lm
 ... | k , e₃ | refl
+    rewrite +-assoc i j k | +-comm i (j + k) | +-comm j k
+
     with interp-mon m₁ ρ₂ s in im1 | im
 ... | just (Int n , s′) | ()
 ... | just (Bool true , s′) | im2
-    with ++-length ρ₁ (j + k) i (trans lρ₁ (trans (+-assoc i j k) (+-comm i (j + k))))
+    with ++-length ρ₁ (k + j) i lρ₁
+... | ρ₁₁₂ , ρ₁₃ , refl , lρ₁₁₂ , lρ₁₃
+    with ++-length ρ₁₁₂ k j lρ₁₁₂
 ... | ρ₁₁ , ρ₁₂ , refl , lρ₁₁ , lρ₁₂
-    rewrite ++-assoc ρ₁₁ ρ₁₂ ρ₂
-    with lift-locals-mon-correct m₁ e₁ s s′ (Value.Bool true) ρ₁₂ ρ₂ i im1 lm1 lρ₁₂
-... | ρ′₁₂ , e₁⇓ , lρ′₁₂
-    with ⇓shifts{ρ₁ = []}{[]}{ρ₁₁}{ρ₁₂ ++ ρ₂}{ρ′₁₂ ++ ρ₂} e₁⇓ refl
-... | ρ′₁₁ , se1⇓ , lρ′₁₁
-    rewrite lρ₁₁
+    with lift-locals-mon-correct m₁ e₁ s s′ (Value.Bool true) ρ₁₃ ρ₂ i im1 lm1 lρ₁₃
+... | ρ′₁₃ , e₁⇓ , lρ′₁₃
+    with lift-locals-mon-correct m₂ e₂ s′ s″ v ρ₁₂ ρ₂ j im2 lm2 lρ₁₂
+... | ρ′₁₂ , e₂⇓ , lρ′₁₂
+
+--     with ⇓shifts{ρ₁ = []}{[]}{ρ₁₁ ++ ρ₁₂}{ρ₁₃ ++ ρ₂}{ρ′₁₃ ++ ρ₂} e₁⇓ refl
+-- ... | ρ′₁₁₂ , se1⇓ , lρ′₁₁₂
+
+
+
+--     rewrite sym (++-assoc (ρ₁₁ ++ ρ₁₂) ρ₁₃ ρ₂)
+--     | length-++ ρ₁₁ {ρ₁₂} | lρ₁₁ | lρ₁₂
+--     with ⇓shifts{ρ₁ = []}{[]}{ρ₁₁}{ρ₁₂ ++ ρ₂}{ρ′₁₂ ++ ρ₂} e₂⇓ refl
+-- ... | ρ′₁₁ , se2⇓ , lρ′₁₁
+--     rewrite lρ₁₁ | sym (++-assoc ρ₁₁ ρ₁₂ ρ₂) | sym (++-assoc ρ′₁₁ ρ′₁₂ ρ₂)
+--     with ⇓shifts{ρ₁ = {!!}}{{!!}}{ρ′₁₃}{ρ₂}{ρ₂} se2⇓ {!!}
+--     -- (trans (length-++ ρ′₁₁ {ρ′₁₂}) (trans (cong₂ _+_ (trans lρ′₁₁ (sym lρ₁₁)) (trans (sym lρ′₁₂) (sym lρ₁₂))) (sym (length-++ ρ₁₁ {ρ₁₂}))))
+-- ... | ρ″₁₃ , se2⇓′ , lρ″₁₃
     =
 
-    {!!} , ⇓if-true se1⇓ {!!} , {!!}
+    {!!} , ⇓if-true {!!} {!!} , {!!}
+    
 lift-locals-mon-correct (If m₁ m₂ m₃) e s s″ v ρ₁ ρ₂ n im lm lρ₁
     | i , e₁ | j , e₂ | k , e₃ | refl
     | just (Bool false , s′) | im3 = {!!}

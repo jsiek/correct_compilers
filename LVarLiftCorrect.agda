@@ -47,15 +47,15 @@ lift-locals-mon-correct (Let m₁ m₂) e s s′ v ρ₁ ρ₂ n im lm lρ₁
     with lift-locals-mon-correct m₁ e₁ s s₁ v₁ ρ₁₂ ρ₂ (length ρ₁₂) im1 lm1 refl
 ... | ρ′₁₂ , e₁⇓v₁ , lρ′₁₂
     with ⇓shifts {ρ₁ = []}{[]}{ρ₂ = ρ₁₁ ++ [ v′ ]}{ρ₃ = ρ₁₂ ++ ρ₂} e₁⇓v₁ refl
-... | ρ′₁₁ , se1⇓v₁ , lρ′₁₁
+... | se1⇓v₁ -- ρ′₁₁ , se1⇓v₁ , lρ′₁₁
     rewrite (++-assoc (ρ₁₁ ++ v′ ∷ []) ρ₁₂ ρ₂)
     | length-++ ρ₁₁ {v′ ∷ []} | +-comm (length ρ₁₁) 1
-    with ++-length (ρ′₁₁ ++ ρ′₁₂) (length ρ₁₁ + length ρ₁₂) 1
+    with ++-length ((ρ₁₁ ++ [ v′ ]) ++ ρ′₁₂) (length ρ₁₁ + length ρ₁₂) 1
 ... | lenr11_r12 
-    rewrite length-++ ρ′₁₁ {ρ′₁₂} | lρ′₁₂ | lρ′₁₁ | +-comm 1 (length ρ₁₁ + length ρ′₁₂)
-    with lenr11_r12  refl
+    rewrite length-++ (ρ₁₁ ++ [ v′ ]) {ρ′₁₂} | lρ′₁₂ | +-comm 1 (length ρ₁₁ + length ρ′₁₂)
+    with lenr11_r12  (len-lemma ρ₁₁ ρ′₁₂ v′)
 ... | ρ″ , v″ ∷ [] , ρ″-eq , lρ″ , refl
-    rewrite sym (++-assoc  ρ′₁₁ ρ′₁₂ ρ₂)
+    rewrite sym (++-assoc (ρ₁₁ ++ [ v′ ]) ρ′₁₂ ρ₂)
     | ρ″-eq
     with ++-length ρ″ (length ρ₁₁) (length ρ′₁₂) lρ″
 ... | ρ″₁₁ , ρ″₁₂ , refl , lρ″₁₁ , lρ″₁₂
@@ -65,21 +65,21 @@ lift-locals-mon-correct (Let m₁ m₂) e s s′ v ρ₁ ρ₂ n im lm lρ₁
     with lift-locals-mon-correct m₂ e₂ s₁ s′ v ρ″₁₁ (v₁ ∷ ρ₂) (length ρ″₁₁) im2 lm2 refl
 ... | ρ‴ , e₂⇓v₂ , lρ‴
     with ⇓shifts {ρ₁ = ρ″₁₁}{ρ‴}{ρ₂ = ρ″₁₂}{ρ₃ = v₁ ∷ ρ₂} e₂⇓v₂ (sym lρ‴)
-... | ρ₄ , se2⇓v₂ , lρ₄        
+... | se2⇓v₂  -- ρ₄ , se2⇓v₂ , lρ₄        ρ₄ = ρ″₁₂
     rewrite sym (++-assoc ρ″₁₁ ρ″₁₂ (v₁ ∷ ρ₂))
     | sym (update-++-+ (ρ″₁₁ ++ ρ″₁₂) (v″ ∷ ρ₂) 0 v₁)
-    | sym (++-assoc ρ₄ [ v₁ ] ρ₂)
-    | sym (++-assoc ρ‴ (ρ₄ ++ v₁ ∷ []) ρ₂)
+    | sym (++-assoc ρ″₁₂ [ v₁ ] ρ₂)
+    | sym (++-assoc ρ‴ (ρ″₁₂ ++ v₁ ∷ []) ρ₂)
     =
-    ρ‴ ++ ρ₄ ++ [ v₁ ] , ⇓assign se1⇓v₁ se2⇓v₂ , Goal
+    ρ‴ ++ ρ″₁₂ ++ [ v₁ ] , ⇓assign se1⇓v₁ se2⇓v₂ , Goal
     where
-    Goal : suc (length (ρ″₁₁ ++ ρ″₁₂) + 0) ≡ length (ρ‴ ++ ρ₄ ++ [ v₁ ])
+    Goal : suc (length (ρ″₁₁ ++ ρ″₁₂) + 0) ≡ length (ρ‴ ++ ρ″₁₂ ++ [ v₁ ])
     Goal
         rewrite +-identityʳ (length (ρ″₁₁ ++ ρ″₁₂))
         | length-++ ρ″₁₁ {ρ″₁₂}
-        | length-++ ρ‴ {ρ₄ ++ v₁ ∷ []}
-        | length-++ ρ₄ {v₁ ∷ []}
-        | sym lρ‴ | lρ₄
+        | length-++ ρ‴ {ρ″₁₂ ++ v₁ ∷ []}
+        | length-++ ρ″₁₂ {v₁ ∷ []}
+        | sym lρ‴ --| lρ₄
         | +-comm (length ρ″₁₂) 1
         | sym (+-assoc (length ρ″₁₁) 1 (length ρ″₁₂))
         | +-comm (length ρ″₁₁) 1
