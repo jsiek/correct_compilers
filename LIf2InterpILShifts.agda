@@ -30,11 +30,20 @@ open import LIf2RCOCorrect
 ⇓-store-length {e} {s} {ρ} {v} {s′} {ρ′} (⇓atom ia) = refl
 ⇓-store-length {e} {s} {ρ} {v} {s′} {ρ′} ⇓read = refl
 ⇓-store-length {e} {s} {ρ} {v} {s′} {ρ′} (⇓sub ia1 ia2 subv) = refl
+⇓-store-length {e} {s} {ρ} {v} {s′} {ρ′} (⇓eq ia1 ia2 subv) = refl
 ⇓-store-length {Assign x e₁ e₂} {s} {ρ} {v} {s′} {ρ′} (⇓assign{ρ′ = ρ′₁}{n₁ = n₁} e₁⇓n₁ e₂⇓v) =
   let IH1 = ⇓-store-length {e₁} e₁⇓n₁ in
   let IH2 = ⇓-store-length {e₂} e₂⇓v in
   let ul = update-length ρ′₁ x n₁ in
   trans IH1 (trans (sym ul) IH2)
+⇓-store-length {If e₁ e₂ e₃} {s} {ρ} {v} {s″} {ρ″} (⇓if-true{sρ′ = (s′ , ρ′)} e1⇓true e2⇓v2) =
+  let IH1 = ⇓-store-length {e₁} e1⇓true in
+  let IH2 = ⇓-store-length {e₂} e2⇓v2 in
+  trans IH1 IH2
+⇓-store-length {If e₁ e₂ e₃} {s} {ρ} {v} {s′} {ρ′} (⇓if-false e1⇓true e3⇓v3) = 
+  let IH1 = ⇓-store-length {e₁} e1⇓true in
+  let IH3 = ⇓-store-length {e₃} e3⇓v3 in
+  trans IH1 IH3
 
 interp-shifts-atm : ∀ (a : Atm) (ρ₁ ρ₂ ρ₃ : Env Value)
   → interp-atm (shifts-atm a (length ρ₁) (length ρ₂)) (ρ₁ ++ ρ₂ ++ ρ₃)
@@ -60,6 +69,13 @@ interp-shifts-atm (Var x) ρ₁ ρ₂ ρ₃ = nth-++-shifts-var ρ₁ ρ₂ ρ�
 ⇓sub-elim (⇓sub {n₁ = Int n₁} {Int n₂} eq1 eq2 refl) =
   n₁ , n₂ , eq1 , eq2 , refl , refl , refl
 
+⇓eq-elim : ∀{s s' ρ ρ' a₁ a₂ v}
+   → (s , ρ) ⊢ Eq a₁ a₂ ⇓ v ⊣ (s' , ρ')
+   → Σ[ v₁ ∈ Value ] Σ[ v₂ ∈ Value ] interp-atm a₁ ρ ≡ just v₁ × interp-atm a₂ ρ ≡ just v₂
+       × equal v₁ v₂ ≡ just v × s ≡ s' × ρ ≡ ρ'
+⇓eq-elim (⇓eq{n₁ = n₁}{n₂} eq1 eq2 eq3) =
+    n₁ , n₂ , eq1 , eq2 , eq3 , refl , refl 
+  
 ⇓shifts : ∀ {e : IL-Exp}{v : Value} {s s′ : Inputs} {ρ₁ ρ′₁ ρ₂ ρ₃ ρ′₃ : Env Value} 
   → (s , ρ₁ ++ ρ₃) ⊢ e ⇓ v ⊣ (s′ , ρ′₁ ++ ρ′₃)
   → length ρ′₁ ≡ length ρ₁
@@ -96,6 +112,20 @@ interp-shifts-atm (Var x) ρ₁ ρ₂ ρ₃ = nth-++-shifts-var ρ₁ ρ₂ ρ�
     is1 rewrite interp-shifts-atm a₁ ρ₁ ρ₂ ρ₃ = ia₁
 
     is2 : interp-atm (shifts-atm a₂ (length ρ₁) (length ρ₂)) (ρ₁ ++ ρ₂ ++ ρ₃) ≡ just (Int n₂)
+    is2 rewrite interp-shifts-atm a₂ ρ₁ ρ₂ ρ₃ = ia₂
+
+⇓shifts {Eq a₁ a₂} {v} {s} {s′} {ρ₁}{ρ′₁}{ρ₂}{ρ₃}{ρ′₃} e⇓v lρ1
+    with ⇓eq-elim e⇓v
+... | v₁ , v₂ , ia₁ , ia₂ , eq-v12-v , refl , r=
+    with length≡++{Value}{ρ₁}{ρ′₁}{ρ₃}{ρ′₃} (sym lρ1) r=
+... | refl , refl
+    =
+    ρ₂ , ⇓eq is1 is2 eq-v12-v , refl
+    where
+    is1 : interp-atm (shifts-atm a₁ (length ρ₁) (length ρ₂)) (ρ₁ ++ ρ₂ ++ ρ₃) ≡ just v₁
+    is1 rewrite interp-shifts-atm a₁ ρ₁ ρ₂ ρ₃ = ia₁
+
+    is2 : interp-atm (shifts-atm a₂ (length ρ₁) (length ρ₂)) (ρ₁ ++ ρ₂ ++ ρ₃) ≡ just v₂
     is2 rewrite interp-shifts-atm a₂ ρ₁ ρ₂ ρ₃ = ia₂
 
 ⇓shifts {Assign x e₁ e₂} {v₂} {s} {s′} {ρ₁}{ρ′₁}{ρ₂}{ρ₃}{ρ′₃}
@@ -150,7 +180,31 @@ interp-shifts-atm (Var x) ρ₁ ρ₂ ρ₃ = nth-++-shifts-var ρ₁ ρ₂ ρ�
                                                                  (≤⇒≤ᵇ (subst (λ X → X ≤ x)
                                                                         lρ″₁ ρ″₁≤x)))))
     | update-length ρ″₁ x n₁ | lρ″₁ | lρ″₂
-    =
-      ρ‴₂ , ⇓assign se1⇓n1 se2⇓v₂ , lρ‴₂
+    = ρ‴₂ , ⇓assign se1⇓n1 se2⇓v₂ , lρ‴₂
 
+⇓shifts {If e₁ e₂ e₃} {v} {s} {s″} {ρ₁} {ρ″₁} {ρ₂} {ρ₃} {ρ″₃} (⇓if-true{_}{(s′ , ρ′)} e1⇓v1 e2⇓v2) lρ1
+    with ⇓-store-length e1⇓v1
+... | r13=r′
+    rewrite length-++ ρ₁ {ρ₃}
+    with ++-length ρ′ (length ρ₁) (length ρ₃) (sym r13=r′)
+... | ρ′₁ , ρ′₃ , refl , lρ′₁ , lρ′₃
+    with ⇓shifts {e₁}{_}{s}{_}{ρ₁}{ρ′₁}{ρ₂}{ρ₃}{ρ′₃} e1⇓v1 lρ′₁
+... | ρ′₂ , se1⇓v1 , lρ′₂
+    with ⇓shifts {e₂}{v}{s′}{s″}{ρ′₁}{ρ″₁}{ρ′₂}{ρ′₃}{ρ″₃} e2⇓v2 (trans lρ1 (sym lρ′₁))
+... | ρ″₂ , se2⇓v2 , lρ″₂
+    rewrite lρ′₁ | lρ′₂
+    = ρ″₂ , ⇓if-true se1⇓v1 se2⇓v2 , lρ″₂
+
+⇓shifts {If e₁ e₂ e₃} {v} {s} {s″} {ρ₁} {ρ″₁} {ρ₂} {ρ₃} {ρ″₃} (⇓if-false{_}{(s′ , ρ′)} e1⇓v1 e3⇓v3) lρ1
+    with ⇓-store-length e1⇓v1
+... | r13=r′
+    rewrite length-++ ρ₁ {ρ₃}
+    with ++-length ρ′ (length ρ₁) (length ρ₃) (sym r13=r′)
+... | ρ′₁ , ρ′₃ , refl , lρ′₁ , lρ′₃
+    with ⇓shifts {e₁}{_}{s}{_}{ρ₁}{ρ′₁}{ρ₂}{ρ₃}{ρ′₃} e1⇓v1 lρ′₁
+... | ρ′₂ , se1⇓v1 , lρ′₂
+    with ⇓shifts {e₃}{v}{s′}{s″}{ρ′₁}{ρ″₁}{ρ′₂}{ρ′₃}{ρ″₃} e3⇓v3 (trans lρ1 (sym lρ′₁))
+... | ρ″₂ , se3⇓v3 , lρ″₂
+    rewrite lρ′₁ | lρ′₂
+    = ρ″₂ , ⇓if-false se1⇓v1 se3⇓v3 , lρ″₂
     

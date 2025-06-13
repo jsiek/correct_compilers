@@ -36,7 +36,7 @@ The main correctness theorem for LVar is in
     
 LIf (Exp)  (LIf2.agda)
   |
-  |
+  | rco              (LIf2RCOCorrect.agda)
   V
 LMonIf (Atm,Mon)
   |
