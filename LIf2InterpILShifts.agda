@@ -78,16 +78,15 @@ interp-shifts-atm (Var x) ρ₁ ρ₂ ρ₃ = nth-++-shifts-var ρ₁ ρ₂ ρ�
 ⇓shifts : ∀ {e : IL-Exp}{v : Value} {s s′ : Inputs} {ρ₁ ρ′₁ ρ₂ ρ₃ ρ′₃ : Env Value} 
   → (s , ρ₁ ++ ρ₃) ⊢ e ⇓ v ⊣ (s′ , ρ′₁ ++ ρ′₃)
   → length ρ′₁ ≡ length ρ₁
-  → Σ[ ρ′₂ ∈ Env Value ] (s , ρ₁ ++ ρ₂ ++ ρ₃) ⊢
-      shifts-ilexp e (length ρ₁) (length ρ₂) ⇓ v ⊣ (s′ , ρ′₁ ++ ρ′₂ ++ ρ′₃)
-    × length ρ′₂ ≡ length ρ₂
+  → (s , ρ₁ ++ ρ₂ ++ ρ₃) ⊢
+      shifts-ilexp e (length ρ₁) (length ρ₂) ⇓ v ⊣ (s′ , ρ′₁ ++ ρ₂ ++ ρ′₃)
 ⇓shifts {Atom a} {v} {s} {s′}{ρ₁}{ρ′₁}{ρ₂}{ρ₃}{ρ′₃} e⇓v lρ1
     with ⇓atom-elim e⇓v
 ... | ia , refl , eq2 
     with length≡++{Value}{ρ₁}{ρ′₁}{ρ₃}{ρ′₃} (sym lρ1) eq2
 ... | refl , refl
     =
-    ρ₂ , ⇓atom Subgoal , refl
+    ⇓atom Subgoal
     where
     Subgoal : interp-atm (shifts-atm a (length ρ₁) (length ρ₂)) (ρ₁ ++ ρ₂ ++ ρ₃) ≡ just v
     Subgoal rewrite interp-shifts-atm a ρ₁ ρ₂ ρ₃ = ia
@@ -97,7 +96,7 @@ interp-shifts-atm (Var x) ρ₁ ρ₂ ρ₃ = nth-++-shifts-var ρ₁ ρ₂ ρ�
 ... | refl , refl , refl , eq4
     with length≡++{Value}{ρ₁}{ρ′₁}{ρ₃}{ρ′₃} (sym lρ1) (sym eq4)
 ... | refl , refl
-    = ρ₂ , ⇓read , refl
+    = ⇓read
 
 ⇓shifts {Sub a₁ a₂} {v} {s} {s′} {ρ₁}{ρ′₁}{ρ₂}{ρ₃}{ρ′₃} e⇓v lρ1
     with ⇓sub-elim e⇓v
@@ -105,7 +104,7 @@ interp-shifts-atm (Var x) ρ₁ ρ₂ ρ₃ = nth-++-shifts-var ρ₁ ρ₂ ρ�
     with length≡++{Value}{ρ₁}{ρ′₁}{ρ₃}{ρ′₃} (sym lρ1) r=
 ... | refl , refl
     =
-    ρ₂ , ⇓sub is1 is2 refl , refl
+    ⇓sub is1 is2 refl
     where
     is1 : interp-atm (shifts-atm a₁ (length ρ₁) (length ρ₂)) (ρ₁ ++ ρ₂ ++ ρ₃) ≡ just (Int n₁)
     is1 rewrite interp-shifts-atm a₁ ρ₁ ρ₂ ρ₃ = ia₁
@@ -119,7 +118,7 @@ interp-shifts-atm (Var x) ρ₁ ρ₂ ρ₃ = nth-++-shifts-var ρ₁ ρ₂ ρ�
     with length≡++{Value}{ρ₁}{ρ′₁}{ρ₃}{ρ′₃} (sym lρ1) r=
 ... | refl , refl
     =
-    ρ₂ , ⇓eq is1 is2 eq-v12-v , refl
+    ⇓eq is1 is2 eq-v12-v
     where
     is1 : interp-atm (shifts-atm a₁ (length ρ₁) (length ρ₂)) (ρ₁ ++ ρ₂ ++ ρ₃) ≡ just v₁
     is1 rewrite interp-shifts-atm a₁ ρ₁ ρ₂ ρ₃ = ia₁
@@ -135,51 +134,47 @@ interp-shifts-atm (Var x) ρ₁ ρ₂ ρ₃ = nth-++-shifts-var ρ₁ ρ₂ ρ�
     with ++-length ρ′ (length ρ₁) (length ρ₃) (sym r13=r′)
 ... | ρ″₁ , ρ″₃ , refl , lρ″₁ , lρ″₃
     with ⇓shifts {e₁}{n₁}{s}{_}{ρ₁}{ρ″₁}{ρ₂}{ρ₃}{ρ″₃} e₁⇓n₁ lρ″₁
-... | ρ″₂ , se1⇓n1 , lρ″₂
+... | se1⇓n1
     with length ρ₁ ≤ᵇ x in r1x
 ... | true
     with m≤n⇒-+ (length ρ₁) x (≤ᵇ⇒≤ (length ρ₁) x (eq-true-top r1x))
 ... | i , refl
     rewrite sym lρ1 | sym lρ″₁ | update-++-+ ρ″₁ ρ″₃ i n₁
-    with ⇓shifts {e₂}{v₂}{_}{s′}{ρ″₁}{ρ′₁}{ρ″₂}{update ρ″₃ i n₁}{ρ′₃} e₂⇓v₂ (sym lρ″₁)
-... | ρ‴₂ , se2⇓v₂ , lρ‴₂ =     
-    ρ‴₂ , ⇓assign se1⇓n1 Goal , trans lρ‴₂ lρ″₂
+    with ⇓shifts {e₂}{v₂}{_}{s′}{ρ″₁}{ρ′₁}{ρ₂}{update ρ″₃ i n₁}{ρ′₃} e₂⇓v₂ (sym lρ″₁)
+... | se2⇓v₂ =     
+    ⇓assign se1⇓n1 Goal
     where
-    EQ : update (ρ″₁ ++ ρ″₂ ++ ρ″₃) (length ρ″₁ + length ρ₂ + i) n₁
-         ≡ ρ″₁ ++ ρ″₂ ++ (update ρ″₃ i n₁)
-    EQ  rewrite (sym lρ″₂) 
-        | sym (++-assoc ρ″₁ ρ″₂ ρ″₃)
-        | sym (length-++ ρ″₁ {ρ″₂})
-        | update-++-+ (ρ″₁ ++ ρ″₂) ρ″₃ i n₁
-        | ++-assoc ρ″₁ ρ″₂ (update ρ″₃ i n₁)
+    EQ : update (ρ″₁ ++ ρ₂ ++ ρ″₃) (length ρ″₁ + length ρ₂ + i) n₁
+         ≡ ρ″₁ ++ ρ₂ ++ (update ρ″₃ i n₁)
+    EQ  rewrite sym (++-assoc ρ″₁ ρ₂ ρ″₃)
+        | sym (length-++ ρ″₁ {ρ₂})
+        | update-++-+ (ρ″₁ ++ ρ₂) ρ″₃ i n₁
+        | ++-assoc ρ″₁ ρ₂ (update ρ″₃ i n₁)
         = refl
        
-    Goal : (_ , update (ρ″₁ ++ ρ″₂ ++ ρ″₃) (length ρ₂ + (length ρ″₁ + i)) n₁)
+    Goal : (_ , update (ρ″₁ ++ ρ₂ ++ ρ″₃) (length ρ₂ + (length ρ″₁ + i)) n₁)
       ⊢ shifts-ilexp e₂ (length ρ″₁) (length ρ₂)
-      ⇓ v₂ ⊣ (s′ , ρ′₁ ++ ρ‴₂ ++ ρ′₃)
+      ⇓ v₂ ⊣ (s′ , ρ′₁ ++ ρ₂ ++ ρ′₃)
     Goal
         rewrite sym (+-assoc (length ρ₂) (length ρ″₁) i)
         | +-comm (length ρ₂) (length ρ″₁)
         | EQ
-        = subst (λ X → (_ , ρ″₁ ++ ρ″₂ ++ update ρ″₃ i n₁) ⊢
-                       shifts-ilexp e₂ (length ρ″₁) X
-                       ⇓ v₂ ⊣ (s′ , ρ′₁ ++ ρ‴₂ ++ ρ′₃))
-                lρ″₂ se2⇓v₂
+        = se2⇓v₂
     
 ⇓shifts {Assign x e₁ e₂} {v₂} {s} {s′} {ρ₁}{ρ′₁}{ρ₂}{ρ₃}{ρ′₃}
         (⇓assign {ρ′ = ρ′}{n₁ = n₁} e₁⇓n₁ e₂⇓v₂) lρ1
-    | r13=r′ | ρ″₁ , ρ″₃ , refl , lρ″₁ , lρ″₃ | ρ″₂ , se1⇓n1 , lρ″₂
+    | r13=r′ | ρ″₁ , ρ″₃ , refl , lρ″₁ , lρ″₃ | se1⇓n1
     | false
     rewrite update-++-< ρ″₁ ρ″₃ x n₁ (≰⇒> λ ρ″₁≤x → (eq-false-not-top r1x)
                                                                  (≤⇒≤ᵇ (subst (λ X → X ≤ x)
                                                                         lρ″₁ ρ″₁≤x)))
-    with ⇓shifts {e₂}{v₂}{_}{s′}{update ρ″₁ x n₁}{ρ′₁}{ρ″₂}{ρ″₃}{ρ′₃} e₂⇓v₂ (sym (trans (update-length ρ″₁ x n₁) (trans lρ″₁ (sym lρ1)) ))
-... | ρ‴₂ , se2⇓v₂ , lρ‴₂
-    rewrite sym (update-++-< ρ″₁ (ρ″₂ ++ ρ″₃) x n₁ ((≰⇒> λ ρ″₁≤x → (eq-false-not-top r1x)
+    with ⇓shifts {e₂}{v₂}{_}{s′}{update ρ″₁ x n₁}{ρ′₁}{ρ₂}{ρ″₃}{ρ′₃} e₂⇓v₂ (sym (trans (update-length ρ″₁ x n₁) (trans lρ″₁ (sym lρ1)) ))
+... | se2⇓v₂
+    rewrite sym (update-++-< ρ″₁ (ρ₂ ++ ρ″₃) x n₁ ((≰⇒> λ ρ″₁≤x → (eq-false-not-top r1x)
                                                                  (≤⇒≤ᵇ (subst (λ X → X ≤ x)
                                                                         lρ″₁ ρ″₁≤x)))))
-    | update-length ρ″₁ x n₁ | lρ″₁ | lρ″₂
-    = ρ‴₂ , ⇓assign se1⇓n1 se2⇓v₂ , lρ‴₂
+    | update-length ρ″₁ x n₁ | lρ″₁
+    = ⇓assign se1⇓n1 se2⇓v₂
 
 ⇓shifts {If e₁ e₂ e₃} {v} {s} {s″} {ρ₁} {ρ″₁} {ρ₂} {ρ₃} {ρ″₃} (⇓if-true{_}{(s′ , ρ′)} e1⇓v1 e2⇓v2) lρ1
     with ⇓-store-length e1⇓v1
@@ -188,11 +183,11 @@ interp-shifts-atm (Var x) ρ₁ ρ₂ ρ₃ = nth-++-shifts-var ρ₁ ρ₂ ρ�
     with ++-length ρ′ (length ρ₁) (length ρ₃) (sym r13=r′)
 ... | ρ′₁ , ρ′₃ , refl , lρ′₁ , lρ′₃
     with ⇓shifts {e₁}{_}{s}{_}{ρ₁}{ρ′₁}{ρ₂}{ρ₃}{ρ′₃} e1⇓v1 lρ′₁
-... | ρ′₂ , se1⇓v1 , lρ′₂
-    with ⇓shifts {e₂}{v}{s′}{s″}{ρ′₁}{ρ″₁}{ρ′₂}{ρ′₃}{ρ″₃} e2⇓v2 (trans lρ1 (sym lρ′₁))
-... | ρ″₂ , se2⇓v2 , lρ″₂
-    rewrite lρ′₁ | lρ′₂
-    = ρ″₂ , ⇓if-true se1⇓v1 se2⇓v2 , lρ″₂
+... |  se1⇓v1
+    with ⇓shifts {e₂}{v}{s′}{s″}{ρ′₁}{ρ″₁}{ρ₂}{ρ′₃}{ρ″₃} e2⇓v2 (trans lρ1 (sym lρ′₁))
+... | se2⇓v2
+    rewrite lρ′₁
+    = ⇓if-true se1⇓v1 se2⇓v2
 
 ⇓shifts {If e₁ e₂ e₃} {v} {s} {s″} {ρ₁} {ρ″₁} {ρ₂} {ρ₃} {ρ″₃} (⇓if-false{_}{(s′ , ρ′)} e1⇓v1 e3⇓v3) lρ1
     with ⇓-store-length e1⇓v1
@@ -201,9 +196,9 @@ interp-shifts-atm (Var x) ρ₁ ρ₂ ρ₃ = nth-++-shifts-var ρ₁ ρ₂ ρ�
     with ++-length ρ′ (length ρ₁) (length ρ₃) (sym r13=r′)
 ... | ρ′₁ , ρ′₃ , refl , lρ′₁ , lρ′₃
     with ⇓shifts {e₁}{_}{s}{_}{ρ₁}{ρ′₁}{ρ₂}{ρ₃}{ρ′₃} e1⇓v1 lρ′₁
-... | ρ′₂ , se1⇓v1 , lρ′₂
-    with ⇓shifts {e₃}{v}{s′}{s″}{ρ′₁}{ρ″₁}{ρ′₂}{ρ′₃}{ρ″₃} e3⇓v3 (trans lρ1 (sym lρ′₁))
-... | ρ″₂ , se3⇓v3 , lρ″₂
-    rewrite lρ′₁ | lρ′₂
-    = ρ″₂ , ⇓if-false se1⇓v1 se3⇓v3 , lρ″₂
+... | se1⇓v1
+    with ⇓shifts {e₃}{v}{s′}{s″}{ρ′₁}{ρ″₁}{ρ₂}{ρ′₃}{ρ″₃} e3⇓v3 (trans lρ1 (sym lρ′₁))
+... | se3⇓v3
+    rewrite lρ′₁
+    = ⇓if-false se1⇓v1 se3⇓v3
     
