@@ -1,5 +1,6 @@
 module LIf2LiftCorrect where
 
+open import Agda.Builtin.Bool
 open import Data.Nat using (ℕ; zero; suc; _<_; _≤_; _≤ᵇ_; _∸_; _+_; s≤s)
 open import Data.Nat.Properties
 open import Data.Product
@@ -45,7 +46,31 @@ lift-locals-mon-correct (Eq a₁ a₂) e s s′ v [] ρ₂ n im refl refl
     with equal v₁ v₂ in e12 | im″
 ... | just v | refl
     = [] , ⇓eq ia₁ ia₂ e12 , refl
-lift-locals-mon-correct (If m₁ m₂ m₃) e s s′ v ρ₁ ρ₂ n im lm lρ₁ = {!!}
+lift-locals-mon-correct (If m₁ m₂ m₃) e s s″ v ρ₁ ρ₂ n im lm lρ₁
+    with lift-locals-mon m₁ in lm1
+... | i , e₁
+    with lift-locals-mon m₂ in lm2
+... | j , e₂
+    with lift-locals-mon m₃ in lm3 | lm
+... | k , e₃ | refl
+    with interp-mon m₁ ρ₂ s in im1 | im
+... | just (Int n , s′) | ()
+... | just (Bool true , s′) | im2
+    with ++-length ρ₁ (j + k) i (trans lρ₁ (trans (+-assoc i j k) (+-comm i (j + k))))
+... | ρ₁₁ , ρ₁₂ , refl , lρ₁₁ , lρ₁₂
+    rewrite ++-assoc ρ₁₁ ρ₁₂ ρ₂
+    with lift-locals-mon-correct m₁ e₁ s s′ (Value.Bool true) ρ₁₂ ρ₂ i im1 lm1 lρ₁₂
+... | ρ′₁₂ , e₁⇓ , lρ′₁₂
+    with ⇓shifts{ρ₁ = []}{[]}{ρ₁₁}{ρ₁₂ ++ ρ₂}{ρ′₁₂ ++ ρ₂} e₁⇓ refl
+... | ρ′₁₁ , se1⇓ , lρ′₁₁
+    rewrite lρ₁₁
+    =
+
+    {!!} , ⇓if-true se1⇓ {!!} , {!!}
+lift-locals-mon-correct (If m₁ m₂ m₃) e s s″ v ρ₁ ρ₂ n im lm lρ₁
+    | i , e₁ | j , e₂ | k , e₃ | refl
+    | just (Bool false , s′) | im3 = {!!}
+
 lift-locals-mon-correct (Let m₁ m₂) e s s′ v ρ₁ ρ₂ n im lm lρ₁ = {!!}
 
 --     with lift-locals-mon m₁ in lm1 | lm

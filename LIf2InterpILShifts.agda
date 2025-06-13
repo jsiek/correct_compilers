@@ -2,7 +2,6 @@ module LIf2InterpILShifts where
 
 open import Agda.Builtin.Unit
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.Bool using ()
 open import Data.Nat using (ℕ; zero; suc; _<_; _≤_; _≤ᵇ_; _∸_; _+_; s≤s)
 open import Data.Nat.Properties
 open import Data.Product
