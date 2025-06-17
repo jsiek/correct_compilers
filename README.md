@@ -9,23 +9,26 @@ The main correctness theorem for LVar is in
 
     LVarCorrect.agda
 
-LVar (Exp)           (LVar.agda)
-  |
-  | rco              (LVarRCOCorrect.agda)
-  V
-LMonVar (Atm,Mon)
-  |
-  | lift-locals      (LVarInterpILShifts.agda + LVarLiftCorrect.agda)
-  V
- ILVar (IL-Exp, IL-Prog)
-  |
-  | explicate        (LVarExplicateCorrect.agda)
-  V
-CVar (CExp, CStmt, CProg)
-  |
-  | select-inst      (LVarSelectCorrect.agda)
-  V
-X86Var (Arg, Inst)
+Here's the sequence of compiler passes, intermediate languages, and the
+Agda files that prove their correctess.
+
+    LVar (Exp)           (LVar.agda)
+      |
+      | rco              (LVarRCOCorrect.agda)
+      V
+    LMonVar (Atm,Mon)
+      |
+      | lift-locals      (LVarInterpILShifts.agda + LVarLiftCorrect.agda)
+      V
+     ILVar (IL-Exp, IL-Prog)
+      |
+      | explicate        (LVarExplicateCorrect.agda)
+      V
+    CVar (CExp, CStmt, CProg)
+      |
+      | select-inst      (LVarSelectCorrect.agda)
+      V
+    X86Var (Arg, Inst)
 
 
 ## The LIf Language (If + Booleans + Let + Integers)
@@ -33,21 +36,31 @@ X86Var (Arg, Inst)
 The main correctness theorem for LVar is in
 
     LIf2Correct.agda
-    
-LIf (Exp)  (LIf2.agda)
-  |
-  | rco              (LIf2RCOCorrect.agda)
-  V
-LMonIf (Atm,Mon)
-  |
-  | lift-locals      (LIf2InterpILShifts.agda + LIf2LiftCorrect.agda)
-  V
- ILIf (IL-Exp, IL-Prog)
-  |
-  | explicate        (LIf2ExplicateCorrect.agda)
-  V
-CIf (CExp, CStmt, CProg)
-  |
-  | select-inst      (LIf2SelectCorrect.agda)
-  V
-X86If (Arg, Inst)
+
+Here's the sequence of compiler passes, intermediate languages, and the
+Agda files that prove their correctess.
+
+    LIf (Exp)  (LIf2.agda)
+      |
+      | rco              (LIf2RCOCorrect.agda)
+      V
+    LMonIf (Atm,Mon)
+      |
+      | lift-locals      (LIf2InterpILShifts.agda + LIf2LiftCorrect.agda)
+      V
+     ILIf (IL-Exp, IL-Prog)
+      |
+      | explicate        (LIf2ExplicateCorrect.agda)
+      V
+    CIf (CExp, CStmt, CProg)
+      |
+      | select-inst      (LIf2SelectCorrect.agda)
+      V
+    X86If (Arg, Inst)
+
+
+# Related Work
+
+## CakeML
+
+The translation from stackLang to labLang handles the conversion from structured control-flow into gotos, so it serves a similar purpose to explicate control. However, CakeML does not use a control-flow translation for Boolean expressions or do the case-of-case optimization, but instead takes the straightforward approach of translation each `if` directly into a conditional jump.

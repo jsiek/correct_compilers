@@ -195,7 +195,7 @@ select-stmt-correct : ∀ (st : CStmt) (ρ ρ′ : Env Value) (s s′ : Inputs) 
   → (s , ρ) , B ⊢ᶜ st ⇓ v ⊣ (s′ , ρ′)
   → 0 < length regs
   → Σ[ regs′ ∈ Env Value ] Σ[ b ∈ 𝔹 ]
-    (s , regs , ρ) , (map select-stmt B) ⊩ select-stmt st ⇓ (s′ , regs′ , ρ′) , b × nth regs′ 0 ≡ just v
+    (s , regs , ρ) , (map select-stmt B) ⊩ select-stmt st ⇓ (s′ , regs′ , ρ′) , b × nth regs′ rax ≡ just v
 select-stmt-correct (Return e) ρ ρ′ s s′ regs v B (⇓return ie) regs-pos
     with select-exp-correct e ρ s s′ (Reg rax) regs v (map select-stmt B) ie regs-pos (RegOK (s≤s z≤n))
 ... | (s′ , regs′ , ρ′) , se⇓st′ , refl , nth-rax-v , refl , len-regs′
