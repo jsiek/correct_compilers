@@ -1,6 +1,7 @@
 # correct_compilers
 
-Experiments in proving compiler correctness
+Experiments in proving compiler correctness. Starting with parts of
+the compilers from my _Essentials of Compilation_ textbook.
 
 
 ## The LVar Language (Let + Integers)
@@ -61,10 +62,26 @@ Agda files that prove their correctess.
 
 # Related Work
 
-## A New One-Pass Transformation into Monadic Normal Form (Olivier Danvy)
+## Chez Scheme (Dybvig)
+
+The above compiler passes all descend from Dybvig's Chez Scheme
+compiler and the course notes that Dybvig used for his compiler course
+at Indiana University.
+
+## A New One-Pass Transformation into Monadic Normal Form (Olivier Danvy, 2003)
 
 The explicate pass, at a high level, does the same thing as Olivier's
 one-pass transformation.
+
+## Modern Compiler Implementation in Java (Appel and Palsberg, 2003)
+
+The explicate pass is also similar to the algorithm presented in this
+compiler textbook.
+
+## Compilers: Principles, Techniques, and Tools (Aho, Sethi, Ullman, 1986)
+
+The classic dragon book gives an attribute grammar formulation of
+an algorithm that is very similar to explicate.
 
 ## CakeML
 
