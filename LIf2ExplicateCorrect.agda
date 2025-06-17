@@ -47,12 +47,92 @@ nth-blocks : ∀ {B₁ B₂ : Blocks} {l : ℕ} {t : CStmt}
   → nth B₂ l ≡ just t
 nth-blocks {B₁}{l = l}{t} (B , refl) n1 = nth-++-just B₁ B l t n1
 
-postulate explicate-tail-blocks : ∀ (m : IL-Exp) (B₁ B₂ : Blocks) (t : CStmt) → explicate-tail m B₁ ≡ (t , B₂) → B₁ ↝ B₂
-postulate explicate-assign-blocks : ∀ (x : Id) (m : IL-Exp) (t t' : CStmt) (B₁ B₂ : Blocks) → explicate-assign x m t B₁ ≡ (t' , B₂) → B₁ ↝ B₂
-postulate explicate-pred-blocks : ∀ (m : IL-Exp) (t₁ t₂ t : CStmt) (B₁ B₂ : Blocks) → explicate-pred m t₁ t₂ B₁ ≡ (t , B₂) → B₁ ↝ B₂
+explicate-assign-blocks : ∀ {x : Id}{m : IL-Exp} {t t' : CStmt} {B₁ B₂ : Blocks} → explicate-assign x m t B₁ ≡ (t' , B₂) → B₁ ↝ B₂
+explicate-pred-blocks : ∀ {m : IL-Exp}{t₁ t₂ t : CStmt}{B₁ B₂ : Blocks} → explicate-pred m t₁ t₂ B₁ ≡ (t , B₂) → B₁ ↝ B₂
+explicate-tail-blocks : ∀ {m : IL-Exp} {B₁ B₂ : Blocks}{t : CStmt} → explicate-tail m B₁ ≡ (t , B₂) → B₁ ↝ B₂
 
-postulate eval-blocks : ∀ {t : CStmt}{ ρ ρ′ : Env Value}{B₁ B₂ : Blocks}{s s′ : Inputs}{v : Value} → B₁ ↝ B₂ → (s , ρ) , B₁ ⊢ᶜ t ⇓ v ⊣ (s′ , ρ′) → (s , ρ) , B₂ ⊢ᶜ t ⇓ v ⊣ (s′ , ρ′)
+explicate-pred-blocks {Atom a} {c-thn} {c-els} {c} {B₁} {B₂} refl =
+    let (l-thn , B′) = create-block c-thn B₁ in
+    let (l-els , _) = create-block c-els B′ in 
+    let B₁↝B′ = ↝-create-block c-thn B₁ B′ l-thn refl in
+    let B′↝B₂ = ↝-create-block c-els B′ B₂ l-els refl in
+    ↝-trans B₁↝B′ B′↝B₂
+explicate-pred-blocks {Read} {c-thn} {c-els} {c} {B₁} {B₂} refl = ↝-refl
+explicate-pred-blocks {Sub a₁ a₂} {c-thn} {c-els} {c} {B₁} {B₂} refl = ↝-refl
+explicate-pred-blocks {Eq a₁ a₂} {c-thn} {c-els} {c} {B₁} {B₂} refl =
+    let (l-thn , B′) = create-block c-thn B₁ in
+    let (l-els , _) = create-block c-els B′ in 
+    let B₁↝B′ = ↝-create-block c-thn B₁ B′ l-thn refl in
+    let B′↝B₂ = ↝-create-block c-els B′ B₂ l-els refl in
+    ↝-trans B₁↝B′ B′↝B₂
+explicate-pred-blocks {Assign x e₁ e₂} {c-thn} {c-els} {c} {B₁} {B₂} refl = 
+    let (c₂ , B′) = explicate-pred e₂ c-thn c-els B₁ in
+    let (c₁ , _) = explicate-assign x e₁ c₂ B′ in
+    let B₁↝B′ = explicate-pred-blocks {e₂}{c-thn}{c-els}{c₂}{B₁}{B′} refl in
+    let B′↝B₂ = explicate-assign-blocks {x}{e₁}{c₂}{c₁}{B′}{B₂} refl in
+    ↝-trans B₁↝B′ B′↝B₂
+explicate-pred-blocks {If e₁ e₂ e₃} {thn} {els} {c} {B₁} {B₂} refl =
+    let (lbl-thn , B′) = create-block thn B₁ in 
+    let (lbl-els , B″) = create-block els B′ in 
+    let (c₂ , B‴) = explicate-pred e₂ (Goto lbl-thn) (Goto lbl-els) B″ in 
+    let (c₃ , B⁗) = explicate-pred e₃ (Goto lbl-thn) (Goto lbl-els) B‴ in 
+    let B₁↝B′ = ↝-create-block thn B₁ B′ lbl-thn refl in
+    let B′↝B″ = ↝-create-block els B′ B″ lbl-els refl in
+    let B″↝B‴ = explicate-pred-blocks {e₂}{Goto lbl-thn}{Goto lbl-els}{c₂}{B″}{B‴} refl in
+    let B‴↝B⁗ = explicate-pred-blocks {e₃}{Goto lbl-thn}{Goto lbl-els}{c₃}{B‴}{B⁗} refl in
+    let B⁗↝B₂ = explicate-pred-blocks {e₁}{c₂}{c₃}{c}{B⁗}{B₂} refl in
+    ↝-trans B₁↝B′ (↝-trans B′↝B″ (↝-trans B″↝B‴ (↝-trans B‴↝B⁗ B⁗↝B₂)))
 
+explicate-tail-blocks {Atom a} {B₁} {B₂} {t} refl = ↝-refl
+explicate-tail-blocks {Read} {B₁} {B₂} {t} refl = ↝-refl
+explicate-tail-blocks {Sub a₁ a₂} {B₁} {B₂} {t} refl = ↝-refl
+explicate-tail-blocks {Eq a₁ a₂} {B₁} {B₂} {t} refl = ↝-refl
+explicate-tail-blocks {Assign x e₁ e₂} {B₁} {B₂} {t} et
+    with explicate-tail e₂ B₁ in et2 | et
+... | c₂ , B′ | refl =
+    let B₁↝B′ = explicate-tail-blocks {e₂} et2 in
+    let B′↝B₂ = explicate-assign-blocks {x}{e₁} refl in
+    ↝-trans B₁↝B′ B′↝B₂
+explicate-tail-blocks {If e₁ e₂ e₃} {B₁} {B₂} {t} et
+    with explicate-tail e₂ B₁ in et2 | et
+... | c₂ , B′ | et′
+    with explicate-tail e₃ B′ in et3 | et′
+... | c₃ , B″ | et″
+    with explicate-pred e₁ c₂ c₃ B″ in ep1 | et″ 
+... | t , B₂ | refl =
+    let B₁↝B′ = explicate-tail-blocks {e₂}{B₁}{B′} et2 in
+    let B′↝B″ = explicate-tail-blocks {e₃}{B′}{B″} et3 in
+    let B″↝B₂ = explicate-pred-blocks {e₁}{c₂}{c₃}{t}{B″}{B₂} ep1 in
+    ↝-trans B₁↝B′ (↝-trans B′↝B″ B″↝B₂)
+
+explicate-assign-blocks {x} {Atom a} {t} {t'} {B₁} {B₂} refl = ↝-refl
+explicate-assign-blocks {x} {Read} {t} {t'} {B₁} {B₂} refl = ↝-refl
+explicate-assign-blocks {x} {Sub a₁ a₂} {t} {t'} {B₁} {B₂} refl = ↝-refl
+explicate-assign-blocks {x} {Eq a₁ a₂} {t} {t'} {B₁} {B₂} refl = ↝-refl
+explicate-assign-blocks {x} {Assign y e₁ e₂} {t} {t'} {B₁} {B₂} refl =
+    let (t₂ , B′) = explicate-assign x e₂ t B₁ in 
+    let B₁↝B′ = explicate-assign-blocks {x}{e₂}{t}{t₂}{B₁}{B′} refl in
+    let B′↝B₂ = explicate-assign-blocks {y}{e₁}{t₂}{t'}{B′}{B₂} refl in
+    ↝-trans B₁↝B′ B′↝B₂ 
+explicate-assign-blocks {x} {If e₁ e₂ e₃} {t} {t'} {B₁} {B₂} refl =
+    let (cont , B) = create-block t B₁ in
+    let (t₂ , B') = explicate-assign x e₂ (Goto cont) B in 
+    let (t₃ , B'') = explicate-assign x e₃ (Goto cont) B' in 
+    let B₁↝B = ↝-create-block t B₁ B cont refl in
+    let B↝B' = explicate-assign-blocks {x}{e₂}{Goto cont}{t₂}{B}{B'} refl in
+    let B'↝B'' = explicate-assign-blocks {x}{e₃}{Goto cont}{t₃}{B'}{B''} refl in
+    let B''↝B₂ = explicate-pred-blocks {e₁}{t₂}{t₃}{t'}{B''}{B₂} refl in
+    ↝-trans B₁↝B (↝-trans B↝B' (↝-trans B'↝B'' B''↝B₂))
+
+eval-blocks : ∀ {t : CStmt}{ ρ ρ′ : Env Value}{B₁ B₂ : Blocks}{s s′ : Inputs}{v : Value} → B₁ ↝ B₂ → (s , ρ) , B₁ ⊢ᶜ t ⇓ v ⊣ (s′ , ρ′) → (s , ρ) , B₂ ⊢ᶜ t ⇓ v ⊣ (s′ , ρ′)
+eval-blocks {Return e} {ρ} {ρ′} {B₁} {B₂} {s} {s′} {v} B₁↝B₂ (⇓return eq) = ⇓return eq
+eval-blocks {Assign x e t} {ρ} {ρ′} {B₁} {B₂} {s} {s′} {v} B₁↝B₂ (⇓assign ie t⇓v) = ⇓assign ie (eval-blocks B₁↝B₂ t⇓v)
+eval-blocks {IfEq a₁ a₂ thn els} {ρ} {ρ′} {B₁} {B₂} {s} {s′} {v} B₁↝B₂ (⇓if-true ia₁ ia₂ eq nth t⇓v) =
+  ⇓if-true ia₁ ia₂ eq (nth-blocks B₁↝B₂ nth) (eval-blocks B₁↝B₂ t⇓v)
+eval-blocks {IfEq a₁ a₂ thn els} {ρ} {ρ′} {B₁} {B₂} {s} {s′} {v} B₁↝B₂ (⇓if-false ia₁ ia₂ eq nth t⇓v) =
+  ⇓if-false ia₁ ia₂ eq (nth-blocks B₁↝B₂ nth) (eval-blocks B₁↝B₂ t⇓v)
+eval-blocks {Goto l} {ρ} {ρ′} {B₁} {B₂} {s} {s′} {v} B₁↝B₂ (⇓goto nth t⇓v) =
+  ⇓goto (nth-blocks B₁↝B₂ nth) (eval-blocks B₁↝B₂ t⇓v)
 
 sub-not-bool : ∀ {n₁ n₂ : Value}{b : 𝔹}
   → sub n₁ n₂ ≡ just (Bool b)
@@ -157,7 +237,7 @@ explicate-pred-correct {If e₁ e₂ e₃} {c} {c-thn} {c-els} {b} {v} {s} {s′
     let B′↝B₂ : B′ ↝ B₂
         B′↝B₂ = ↝-trans B′↝B₁ B₁↝B₂ in
     let B₃↝B₄ : B₃ ↝ B₄
-        B₃↝B₄ = explicate-pred-blocks e₃ (Goto lbl-thn) (Goto lbl-els) c₃ B₃ B₄ refl in
+        B₃↝B₄ = explicate-pred-blocks {e₃}{Goto lbl-thn}{Goto lbl-els} refl in
 
     let nth-thn : nth B₁ lbl-thn ≡ just c-thn
         nth-thn = nth-create-block{B″} in
@@ -189,7 +269,7 @@ explicate-pred-correct {If e₁ e₂ e₃} {c} {c-thn} {c-els} {b} {v} {s} {s′
     let B′↝B₂ : B′ ↝ B₂
         B′↝B₂ = ↝-trans B′↝B₁ B₁↝B₂ in
 
-    let B₂↝B₃ = (explicate-pred-blocks e₂ (Goto lbl-thn) (Goto lbl-els) c₂ B₂ B₃ refl) in
+    let B₂↝B₃ = (explicate-pred-blocks {e₂}{Goto lbl-thn}{Goto lbl-els} refl) in
     
     let B′↝B₃ : B′ ↝ B₃
         B′↝B₃ = ↝-trans B′↝B₂ B₂↝B₃ in
@@ -247,7 +327,7 @@ explicate-assign-correct {x}{ (If e₁ e₂ e₃)}{ t}{ ρ}{ ρ′}{ ρ″}{ s}{
     =
     let t⇓v′ = eval-blocks ([ t ] , refl) t⇓v in
     let IH2 = explicate-assign-correct e₂⇓v₂ (⇓goto (nth-++-length B [] t) t⇓v′) ea2 in
-    let B′↝B″ = explicate-assign-blocks x e₃ (Goto (length B)) c₃ B′ B″ ea3 in
+    let B′↝B″ = explicate-assign-blocks {x}{e₃}{Goto (length B)}{c₃} ea3 in
     explicate-pred-correct e₁⇓v₁ (λ _ → IH2) (λ ()) B′↝B″ ep1
 
 explicate-assign-correct {x}{ (If e₁ e₂ e₃)}{ t}{ ρ}{ ρ′}{ ρ″}{ s}{ s′}{ s″}{ B}{ B‴}{ c}{ n}{ v} (⇓if-false{sρ′ = (s₁ , ρ₁)} e₁⇓v₁ e₃⇓v₃) t⇓v ep1
@@ -259,7 +339,7 @@ explicate-assign-correct {x}{ (If e₁ e₂ e₃)}{ t}{ ρ}{ ρ′}{ ρ″}{ s}{
     let B₁ = (B ++ t ∷ []) in
     let B↝B₁ : B ↝ B₁
         B↝B₁ = ([ t ] , refl) in
-    let B₁↝B′ = explicate-assign-blocks x e₂ (Goto (length B)) c₂ B₁ B′ ea2 in
+    let B₁↝B′ = explicate-assign-blocks {x}{e₂}{Goto (length B)} ea2 in
     let B↝B′ = ↝-trans B↝B₁ B₁↝B′ in
     let t⇓v′ = eval-blocks B↝B′ t⇓v in
     let nth1 : nth B₁ (length B) ≡ just t
@@ -297,7 +377,7 @@ explicate-tail-correct {(If e₁ e₂ e₃)}{ ρ}{ ρ″}{ s}{ s″}{ B}{ B′}{
     let (c₃ , B₂) = explicate-tail e₃ B₁ in
     let c₂⇓ = explicate-tail-correct {e₂} e₂⇓v refl in
     let B₁↝B₂ : B₁ ↝ B₂
-        B₁↝B₂ = explicate-tail-blocks e₃ B₁ B₂ c₃ refl in
+        B₁↝B₂ = explicate-tail-blocks {e₃} refl in
     explicate-pred-correct {e₁} e₁⇓true (λ _ → c₂⇓) (λ ()) B₁↝B₂ refl
 explicate-tail-correct {(If e₁ e₂ e₃)}{ ρ}{ ρ″}{ s}{ s″}{ B}{ B′}{ c}{ v} (⇓if-false{sρ′ = (s′ , ρ′)} e₁⇓false e₃⇓v) refl =
     let (c₂ , B₁) = explicate-tail e₂ B in
