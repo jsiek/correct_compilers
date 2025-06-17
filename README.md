@@ -61,6 +61,11 @@ Agda files that prove their correctess.
 
 # Related Work
 
+## A New One-Pass Transformation into Monadic Normal Form (Olivier Danvy)
+
+The explicate pass, at a high level, does the same thing as Olivier's
+one-pass transformation.
+
 ## CakeML
 
 The translation from stackLang to labLang handles the conversion from structured control-flow into gotos, so it serves a similar purpose to explicate control. However, CakeML does not use a control-flow translation for Boolean expressions or do the case-of-case optimization, but instead takes the straightforward approach of translation each `if` directly into a conditional jump.
