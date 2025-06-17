@@ -1,12 +1,13 @@
 module LIf2SelectCorrect where
 
+open import Agda.Builtin.Bool renaming (Bool to 𝔹)
 open import Agda.Builtin.Unit
 open import Data.Nat using (ℕ; zero; suc; _<_; _≤_; _≤ᵇ_; _+_; z≤n; s≤s)
 open import Data.Nat.Properties
-open import Data.Product
+open import Data.Product hiding (map)
 open import Data.Integer using (ℤ; -_; _-_; 0ℤ)
 open import Data.List
-open import Data.Maybe
+open import Data.Maybe using (nothing; just)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; sym; subst)
 
 open import Utilities
@@ -33,8 +34,12 @@ InstsOK : List Inst → ℕ → Set
 InstsOK [] nr = ⊤
 InstsOK (i ∷ is) nr = InstOK i nr × InstsOK is nr
 
+BlocksOK : List Block → ℕ → Set
+BlocksOK [] nr = ⊤
+BlocksOK (b ∷ bs) nr = InstsOK b nr × BlocksOK bs nr
+
 X86VarOK : X86Var → ℕ → Set
-X86VarOK (Program nv is) nr = InstsOK is nr
+X86VarOK (Program nv start bs) nr = BlocksOK bs nr
 
 to-arg-correct : ∀ (a : Atm) (ρ : Env Value) (inputs : Inputs) (regs : List Value) 
   → (interp-atm a ρ) ≡ (interp-arg (to-arg a) (inputs , regs , ρ))
@@ -73,50 +78,50 @@ wrote-write2 (Reg x) s regs regs′ ρ v len-regs′ (RegOK lt) regs-pos = refl 
     nth-up : nth (update regs′ x v) x ≡ just v
     nth-up = nth-update regs′ x v (subst (λ X → x < X) (sym len-regs′) (≤-trans lt regs-pos))
 
-select-exp-correct : ∀ (e : CExp) (ρ : Env Value) (s s′ : Inputs) (dest : Dest) (regs : List Value) (v : Value)
+select-exp-correct : ∀ (e : CExp) (ρ : Env Value) (s s′ : Inputs) (dest : Dest) (regs : List Value) (v : Value) (B : List Block) 
   → interp-CExp e ρ s ≡ just (v , s′)
   → 0 < length regs
   → DestOK dest 1
-  → Σ[ st′ ∈ StateX86 ] (s , regs , ρ) ⊩ select-exp e dest ⇓ st′ × wrote dest v (s′ , regs , ρ) st′
+  → Σ[ st′ ∈ StateX86 ] (s , regs , ρ) , B ⊩ select-exp e dest ⇓ st′ , true × wrote dest v (s′ , regs , ρ) st′
   
-select-exp-correct (Atom a) ρ s s′ dest regs v ie regs-pos dest-ok
+select-exp-correct (Atom a) ρ s s′ dest regs v B ie regs-pos dest-ok
     with interp-atm a ρ in ia | ie
 ... | just v | refl =
-    let m : (s , regs , ρ) ⊢ MovQ (to-arg a) dest ⇓ write dest v (s , regs , ρ)
+    let m : (s , regs , ρ) , B ⊢ MovQ (to-arg a) dest ⇓ write dest v (s , regs , ρ) , true
         m = ⇓movq{to-arg a}{dest}{(s , regs , ρ)}{v} Goal in
-    let conc : (s , regs , ρ) ⊩ MovQ (to-arg a) dest ∷ [] ⇓ write dest v (s , regs , ρ)
+    let conc : (s , regs , ρ) , B ⊩ MovQ (to-arg a) dest ∷ [] ⇓ write dest v (s , regs , ρ) , true
         conc = ⇓cons m ⇓null in
     write dest v (s , regs , ρ) , conc , wrote-write dest (s , regs , ρ) v dest-ok regs-pos
     where
     Goal : interp-arg (to-arg a) (s , regs , ρ) ≡ just v
     Goal rewrite sym (to-arg-correct a ρ s regs) = ia
 
-select-exp-correct Read ρ s s′ dest regs v ie regs-pos dest-ok =
+select-exp-correct Read ρ s s′ dest regs v B ie regs-pos dest-ok =
   let regs′ = update regs rax v in
-  let r : (s , regs , ρ) ⊢ ReadInt ⇓ (s′ , regs′ , ρ)
+  let r : (s , regs , ρ) , B ⊢ ReadInt ⇓ (s′ , regs′ , ρ) , true
       r = ⇓read{s}{s′}{regs}{ρ}{v} ie in
-  let m : (s′ , update regs rax v , ρ) ⊢ MovQ (Reg rax) dest ⇓ write dest v (s′ , regs′ , ρ)
+  let m : (s′ , update regs rax v , ρ) , B ⊢ MovQ (Reg rax) dest ⇓ write dest v (s′ , regs′ , ρ) , true
       m = ⇓movq{Reg rax}{dest}{(s′ , regs′ , ρ)}{v} nth-up in
-  let rm : (s , regs , ρ) ⊩ ReadInt ∷ (MovQ (Reg rax) dest) ∷ [] ⇓ write dest v (s′ , regs′ , ρ)
+  let rm : (s , regs , ρ) , B ⊩ (ReadInt ∷ (MovQ (Reg rax) dest) ∷ []) ⇓ (write dest v (s′ , regs′ , ρ)) , true
       rm = ⇓cons r (⇓cons m ⇓null) in
   write dest v (s′ , regs′ , ρ) , rm , wrote-write2 dest s′ regs regs′ ρ v (update-length regs rax v) dest-ok regs-pos
   where
   nth-up : nth (update regs rax v) rax ≡ just v
   nth-up = nth-update regs rax v regs-pos
 
-select-exp-correct (Sub a₁ a₂) ρ s s′ dest regs v ie regs-pos dest-ok
+select-exp-correct (Sub a₁ a₂) ρ s s′ dest regs v B ie regs-pos dest-ok
     with interp-atm a₁ ρ in ia₁
 ... | just (Bool b₁)
     with interp-atm a₂ ρ in ia₂ | ie
 ... | just (Int v₂) | ()
-select-exp-correct (Sub a₁ a₂) ρ s s′ dest regs v ie regs-pos dest-ok
+select-exp-correct (Sub a₁ a₂) ρ s s′ dest regs v B ie regs-pos dest-ok
     | just (Int v₁)
     with interp-atm a₂ ρ in ia₂ | ie
 ... | just (Int v₂) | refl
     =
-    let m1 : (s , regs , ρ) ⊢ MovQ (to-arg a₁) (Reg rax) ⇓ (s , update regs rax (Int v₁) , ρ)
+    let m1 : (s , regs , ρ) , B ⊢ MovQ (to-arg a₁) (Reg rax) ⇓ (s , update regs rax (Int v₁) , ρ) , true
         m1 = ⇓movq{to-arg a₁}{Reg rax}{(s , regs , ρ)}{Int v₁} itoa1 in
-    let sub : (s , update regs rax (Int v₁) , ρ) ⊢ SubQ (to-arg a₂) (Reg rax) ⇓ (s , update (update regs rax (Int v₁)) rax (Int (v₁ - v₂)) , ρ)
+    let sub : (s , update regs rax (Int v₁) , ρ) , B ⊢ SubQ (to-arg a₂) (Reg rax) ⇓ (s , update (update regs rax (Int v₁)) rax (Int (v₁ - v₂)) , ρ) , true
         sub = ⇓subq{to-arg a₂}{Reg rax}{(s , update regs rax (Int v₁) , ρ)}{Int v₁}{Int v₂} itoa2 nth-up refl in
     let m2 = ⇓movq{Reg rax}{dest}{(s , update (update regs rax (Int v₁)) rax (Int (v₁ - v₂)) , ρ)}{Int (v₁ - v₂)} nth-up2 in
     write dest (Int (v₁ - v₂)) (s , update (update regs rax (Int v₁)) rax (Int (v₁ - v₂)) , ρ) ,
@@ -149,16 +154,16 @@ select-exp-correct (Sub a₁ a₂) ρ s s′ dest regs v ie regs-pos dest-ok
     Goal (Reg x) d-ok = refl , nth-update (update (update regs rax (Int v₁)) rax (Int (v₁ - v₂))) x (Int (v₁ - v₂)) (len-up-up-pos x d-ok) , refl ,
           trans (update-length (update (update regs rax (Int v₁)) rax (Int (v₁ - v₂))) x (Int (v₁ - v₂)))
           (trans (update-length (update regs rax (Int v₁)) rax (Int (v₁ - v₂))) (update-length regs rax (Int v₁)))
-select-exp-correct (Eq a₁ a₂) ρ s s′ dest regs v ie regs-pos dest-ok
+select-exp-correct (Eq a₁ a₂) ρ s s′ dest regs v B ie regs-pos dest-ok
     with interp-atm a₁ ρ in ia₁
 ... | just v₁
     with interp-atm a₂ ρ in ia₂
 ... | just v₂
     with equal v₁ v₂ in e₁₂ | ie
 ... | just v | refl =
-    let cmp : (s , regs , ρ) ⊢ CmpQ (to-arg a₁) (to-arg a₂) ⇓ (s , update regs rax v , ρ)
+    let cmp : (s , regs , ρ) , B ⊢ CmpQ (to-arg a₁) (to-arg a₂) ⇓ (s , update regs rax v , ρ) , true
         cmp = ⇓cmpq{a₁ = to-arg a₁}{to-arg a₂} itoa1 itoa2 e₁₂ in
-    let mov : (s , update regs rax v , ρ) ⊢ MovQ (Reg rax) dest ⇓ write dest v (s , update regs rax v , ρ)
+    let mov : (s , update regs rax v , ρ) , B ⊢ MovQ (Reg rax) dest ⇓ write dest v (s , update regs rax v , ρ) , true
         mov = ⇓movq{Reg rax}{dest}{s , update regs rax v , ρ}{v} (nth-update regs rax v regs-pos) in
 
     write dest v (s , update regs rax v , ρ) ,
@@ -172,32 +177,69 @@ select-exp-correct (Eq a₁ a₂) ρ s s′ dest regs v ie regs-pos dest-ok
     itoa2 : interp-arg (to-arg a₂) (s , regs , ρ) ≡ just v₂
     itoa2 rewrite sym (to-arg-correct a₂ ρ s regs) = ia₂
 
-⇓-++ : ∀{st1 st2 st3 : StateX86}{is1 is2 : List Inst}
-  → st1 ⊩ is1 ⇓ st2
-  → st2 ⊩ is2 ⇓ st3
-  → st1 ⊩ is1 ++ is2 ⇓ st3
+⇓-++ : ∀{st1 st2 st3 : StateX86}{is1 is2 : List Inst} {B : List Block} {b : 𝔹}
+  → st1 , B ⊩ is1 ⇓ st2 , true
+  → st2 , B ⊩ is2 ⇓ st3 , b
+  → st1 , B ⊩ is1 ++ is2 ⇓ st3 , b
 ⇓-++ {is1 = []} ⇓null is2⇓ = is2⇓
 ⇓-++ {is1 = i ∷ is1} (⇓cons i⇓ is1⇓) is2⇓ = ⇓cons i⇓ (⇓-++ is1⇓ is2⇓)
 
-select-stmt-correct : ∀ (st : CStmt) (ρ ρ′ : Env Value) (s s′ : Inputs) (regs : List Value) (v : Value)
-  → (s , ρ) ⊢ᶜ st ⇓ v ⊣ (s′ , ρ′)
+⇓-++-halt : ∀{st1 st2 st3 : StateX86}{is1 is2 : List Inst} {B : List Block} {b : 𝔹}
+  → st1 , B ⊩ is1 ⇓ st2 , false
+  → st2 , B ⊩ is2 ⇓ st3 , b
+  → st1 , B ⊩ is1 ++ is2 ⇓ st2 , false
+⇓-++-halt {is1 = i ∷ is1} (⇓cons x is1⇓) is2⇓ = ⇓cons x (⇓-++-halt is1⇓ is2⇓)
+⇓-++-halt {is1 = i ∷ is1} (⇓cons-halt x) is2⇓ = ⇓cons-halt x
+
+select-stmt-correct : ∀ (st : CStmt) (ρ ρ′ : Env Value) (s s′ : Inputs) (regs : List Value) (v : Value) (B : List CStmt)
+  → (s , ρ) , B ⊢ᶜ st ⇓ v ⊣ (s′ , ρ′)
   → 0 < length regs
-  → Σ[ regs′ ∈ Env Value ] (s , regs , ρ) ⊩ select-stmt st ⇓ (s′ , regs′ , ρ′) × nth regs′ 0 ≡ just v
-select-stmt-correct (Return e) ρ ρ′ s s′ regs v (⇓return ie) regs-pos
-    with select-exp-correct e ρ s s′ (Reg rax) regs v ie regs-pos (RegOK (s≤s z≤n))
+  → Σ[ regs′ ∈ Env Value ] Σ[ b ∈ 𝔹 ]
+    (s , regs , ρ) , (map select-stmt B) ⊩ select-stmt st ⇓ (s′ , regs′ , ρ′) , b × nth regs′ 0 ≡ just v
+select-stmt-correct (Return e) ρ ρ′ s s′ regs v B (⇓return ie) regs-pos
+    with select-exp-correct e ρ s s′ (Reg rax) regs v (map select-stmt B) ie regs-pos (RegOK (s≤s z≤n))
 ... | (s′ , regs′ , ρ′) , se⇓st′ , refl , nth-rax-v , refl , len-regs′
-    = regs′ , se⇓st′ , nth-rax-v
-select-stmt-correct (Assign x e st) ρ ρ′ s s′ regs v (⇓assign{s′ = s′₁}{v₁ = v₁} ie st⇓v) regs-pos
-    with select-exp-correct e ρ s s′₁ (Var x) regs v₁ ie regs-pos VarOK
+    = regs′ , true , se⇓st′ , nth-rax-v
+select-stmt-correct (Assign x e st) ρ ρ′ s s′ regs v B (⇓assign{s′ = s′₁}{v₁ = v₁} ie st⇓v) regs-pos
+    with select-exp-correct e ρ s s′₁ (Var x) regs v₁ (map select-stmt B) ie regs-pos VarOK
 ... | (s′₁ , regs′ , ρ″) , se⇓ , refl , refl , len-regs′ 
-    with select-stmt-correct st (update ρ x v₁) ρ′ _ s′ regs′ v st⇓v (subst (λ X → 0 < X) (sym len-regs′)  regs-pos)
-... | regs″ , sst⇓ , nth-rax-v
-    = regs″ , (⇓-++ se⇓ sst⇓) , nth-rax-v
+    with select-stmt-correct st (update ρ x v₁) ρ′ _ s′ regs′ v B st⇓v (subst (λ X → 0 < X) (sym len-regs′)  regs-pos)
+... | regs″ , b₂ , sst⇓ , nth-rax-v =
+      regs″ , b₂ , ⇓-++ se⇓ sst⇓ , nth-rax-v
+select-stmt-correct (IfEq a₁ a₂ thn els) ρ ρ′ s s′ regs v B (⇓if-true{t = t} ia₁ ia₂ eqv nth t⇓v) regs-pos
+    with select-stmt-correct t ρ ρ′ s s′ (update regs rax (Bool true)) v B t⇓v (≤-trans regs-pos (≤-reflexive (sym (update-length regs rax (Bool true)))))
+... | regs′ , b , st⇓ , nth-rax-v =
+    let ia1 = to-arg-correct a₁ ρ s regs in
+    let ia2 = to-arg-correct a₂ ρ s regs in
+    let cmp : (s , regs , ρ) , map select-stmt B ⊢ CmpQ (to-arg a₁) (to-arg a₂) ⇓ s , update regs rax (Bool true) , ρ , true
+        cmp = ⇓cmpq{to-arg a₁}{to-arg a₂}{B = map select-stmt B} (trans (sym ia1) ia₁) (trans (sym ia2) ia₂) eqv in
+    let je : (s , update regs rax (Bool true) , ρ) , map select-stmt B ⊢ JmpEq thn ⇓ s′ , regs′ , ρ′ , false
+        je = ⇓jmpeq-true{s}{update regs rax (Bool true)}{l = thn} (nth-update regs rax (Bool true) regs-pos) (nth-map{xs = B} select-stmt nth) st⇓ in
+    let cmp-je = ⇓cons cmp (⇓cons-halt{is = [ Jmp els ]} je) in
+    regs′ , false , cmp-je , nth-rax-v
+select-stmt-correct (IfEq a₁ a₂ thn els) ρ ρ′ s s′ regs v B (⇓if-false{t = t} ia₁ ia₂ eqv nth t⇓v) regs-pos
+    with select-stmt-correct t ρ ρ′ s s′ (update regs rax (Bool false)) v B t⇓v (≤-trans regs-pos (≤-reflexive (sym (update-length regs rax (Bool false)))))
+... | regs′ , b , st⇓ , nth-rax-v =
+    let ia1 = to-arg-correct a₁ ρ s regs in
+    let ia2 = to-arg-correct a₂ ρ s regs in
+    let cmp : (s , regs , ρ) , map select-stmt B ⊢ CmpQ (to-arg a₁) (to-arg a₂) ⇓ s , update regs rax (Bool false) , ρ , true
+        cmp = ⇓cmpq{to-arg a₁}{to-arg a₂}{B = map select-stmt B} (trans (sym ia1) ia₁) (trans (sym ia2) ia₂) eqv in
+    let je : (s , update regs rax (Bool false) , ρ) , map select-stmt B ⊢ JmpEq thn ⇓ s , update regs rax (Bool false) , ρ , true
+        je = ⇓jmpeq-false{s}{update regs rax (Bool false)} (nth-update regs rax (Bool false) regs-pos) in
+    let j : (s , update regs 0 (Bool false) , ρ) , map select-stmt B ⊢ Jmp els ⇓ s′ , regs′ , ρ′ , false
+        j = ⇓jmp (nth-map{xs = B} select-stmt nth) st⇓ in
+    let cmp-je-j = ⇓cons cmp (⇓cons je (⇓cons-halt{is = []} j)) in
+    regs′ , false , cmp-je-j , nth-rax-v
+select-stmt-correct (Goto l) ρ ρ′ s s′ regs v B (⇓goto{t = t} nth t⇓v) regs-pos
+    with select-stmt-correct t ρ ρ′ s s′ regs v B t⇓v regs-pos
+... | regs′ , b , st⇓ , nth-rax-v =
+    regs′ , false , ⇓cons-halt (⇓jmp{b = b} (nth-map{xs = B} select-stmt nth) st⇓) , nth-rax-v
 
 select-inst-correct : ∀ (p : CProg) (inputs : Inputs) (v : Value)
   → interp-prog p inputs v
   → interp-x86-var (select-inst p) inputs v
-select-inst-correct (Program n st) inputs v ((s′ , ρ′) , st⇓v)
-    with select-stmt-correct st (replicate n (Int 0ℤ)) ρ′ inputs s′ [ Int 0ℤ ] v st⇓v (s≤s z≤n)
-... | regs′ , sst⇓ , nth-rax-v =
-    s′ , regs′ , ρ′ , sst⇓ , nth-rax-v
+select-inst-correct (Program n l B) inputs v ((s′ , ρ′) , (⇓goto{t = t} nth t⇓v))
+    with select-stmt-correct t (replicate n (Int 0ℤ)) ρ′ inputs s′ [ Int 0ℤ ] v B t⇓v (s≤s z≤n)
+... | regs′ , b , sst⇓ , nth-rax-v =
+    s′ , regs′ , ρ′ , false , ⇓jmp (nth-map{xs = B} select-stmt nth) sst⇓ , nth-rax-v
+

@@ -4,11 +4,11 @@ open import Agda.Builtin.Unit
 import Data.Bool
 open import Data.Nat using (ℕ; zero; suc; _≤ᵇ_; _≤_; _<_; _+_; s≤s; _∸_)
 open import Data.Nat.Properties
-open import Data.Product
+open import Data.Product hiding (map)
 open import Data.Integer using (ℤ; -_; _-_; 0ℤ)
 open import Data.List
 open import Data.List.Properties -- using (++-assoc)
-open import Data.Maybe
+open import Data.Maybe hiding (map)
 open import Relation.Binary.PropositionalEquality
    using (_≡_; refl; trans; sym; cong; cong-app; cong₂)
 open import Agda.Builtin.Bool
@@ -168,6 +168,13 @@ nth-++-shifts-var ρ₁ ρ₂ ρ₃ x
     rewrite nth-++-< ρ₁ (ρ₂ ++ ρ₃) x (≰⇒> λ x₁ → (eq-false-not-top lt) (≤⇒≤ᵇ x₁))
     | nth-++-< ρ₁ ρ₃ x (≰⇒> λ x₁ → (eq-false-not-top lt) (≤⇒≤ᵇ x₁))
     = refl
+
+nth-map : ∀{A B : Set} {xs : List A}{i}{v} (f : A → B)
+  → nth xs i ≡ just v
+  → nth (map f xs) i ≡ just (f v)
+nth-map {A} {B} {[]} {i} {v} f ()
+nth-map {A} {B} {x ∷ xs} {zero} {v} f refl = refl
+nth-map {A} {B} {x ∷ xs} {suc i} {v} f nth = nth-map{xs = xs}{i} f nth
 
 update-++-< : ∀{A : Set} → (xs ys : List A) (n : ℕ) (v : A)
        → n < length xs
