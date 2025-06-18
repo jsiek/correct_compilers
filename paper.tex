@@ -1,0 +1,351 @@
+%%
+%% This is file `sample-sigplan.tex',
+%% generated with the docstrip utility.
+%%
+%% The original source files were:
+%%
+%% samples.dtx  (with options: `all,proceedings,bibtex,sigplan')
+%% 
+%% IMPORTANT NOTICE:
+%% 
+%% For the copyright see the source file.
+%% 
+%% Any modified versions of this file must be renamed
+%% with new filenames distinct from sample-sigplan.tex.
+%% 
+%% For distribution of the original source see the terms
+%% for copying and modification in the file samples.dtx.
+%% 
+%% This generated file may be distributed as long as the
+%% original source files, as listed above, are part of the
+%% same distribution. (The sources need not necessarily be
+%% in the same archive or directory.)
+%%
+%%
+%% Commands for TeXCount
+%TC:macro \cite [option:text,text]
+%TC:macro \citep [option:text,text]
+%TC:macro \citet [option:text,text]
+%TC:envir table 0 1
+%TC:envir table* 0 1
+%TC:envir tabular [ignore] word
+%TC:envir displaymath 0 word
+%TC:envir math 0 word
+%TC:envir comment 0 0
+%%
+%% The first command in your LaTeX source must be the \documentclass
+%% command.
+%%
+%% For submission and review of your manuscript please change the
+%% command to \documentclass[manuscript, screen, review]{acmart}.
+%%
+%% When submitting camera ready or to TAPS, please change the command
+%% to \documentclass[sigconf]{acmart} or whichever template is required
+%% for your publication.
+%%
+%%
+\documentclass[sigplan,review,dvipsnames,screen,10pt]{acmart}
+%\documentclass[sigplan,screen]{acmart}
+%%
+%% \BibTeX command to typeset BibTeX logo in the docs
+\AtBeginDocument{%
+  \providecommand\BibTeX{{%
+    Bib\TeX}}}
+
+%% Rights management information.  This information is sent to you
+%% when you complete the rights form.  These commands have SAMPLE
+%% values in them; it is your responsibility as an author to replace
+%% the commands and values with those provided to you when you
+%% complete the rights form.
+\setcopyright{acmlicensed}
+\copyrightyear{2018}
+\acmYear{2018}
+\acmDOI{XXXXXXX.XXXXXXX}
+%% These commands are for a PROCEEDINGS abstract or paper.
+\acmConference[OlivierFest '25]{Workshop dedicated to Olivier Danvy's 65th birthday}{October,
+  2025}{Singapore}
+%%
+%%  Uncomment \acmBooktitle if the title of the proceedings is different
+%%  from ``Proceedings of ...''!
+%%
+%%\acmBooktitle{Woodstock '18: ACM Symposium on Neural Gaze Detection,
+%%  June 03--05, 2018, Woodstock, NY}
+\acmISBN{978-1-4503-XXXX-X/2018/06}
+
+
+%%
+%% Submission ID.
+%% Use this when submitting an article to a sponsored event. You'll
+%% receive a unique submission ID from the organizers
+%% of the event, and this ID should be used as the parameter to this command.
+%%\acmSubmissionID{123-A56-BU3}
+
+%%
+%% For managing citations, it is recommended to use bibliography
+%% files in BibTeX format.
+%%
+%% You can then either use BibTeX with the ACM-Reference-Format style,
+%% or BibLaTeX with the acmnumeric or acmauthoryear sytles, that include
+%% support for advanced citation of software artefact from the
+%% biblatex-software package, also separately available on CTAN.
+%%
+%% Look at the sample-*-biblatex.tex files for templates showcasing
+%% the biblatex styles.
+%%
+
+%%
+%% The majority of ACM publications use numbered citations and
+%% references.  The command \citestyle{authoryear} switches to the
+%% "author year" style.
+%%
+%% If you are preparing content for an event
+%% sponsored by ACM SIGGRAPH, you must use the "author year" style of
+%% citations and references.
+%% Uncommenting
+%% the next command will enable that style.
+%%\citestyle{acmauthoryear}
+
+\newcommand{\TRUE}[0]{\mathsf{true}}
+\newcommand{\FALSE}[0]{\mathsf{false}}
+\newcommand{\IF}[3]{\mathsf{if}\,#1\,\mathsf{then}\,#2\,\mathsf{else}\,#3}
+
+\newcommand{\CE}[1]{\mathcal{E} \llbracket #1 \rrbracket}
+\newcommand{\CB}[3]{\mathcal{B} \llbracket #1 \rrbracket ( #2, #3 )}
+
+%%
+%% end of the preamble, start of the body of the document source.
+\begin{document}
+
+%%
+%% The "title" command has an optional parameter,
+%% allowing the author to define a "short title" to be used in page headers.
+\title{Verified Nanopasses for Compiling Conditionals}
+
+%%
+%% The "author" command and its associated commands are used to define
+%% the authors and their affiliations.
+%% Of note is the shared affiliation of the first two authors, and the
+%% "authornote" and "authornotemark" commands
+%% used to denote shared contribution to the research.
+\author{Jeremy G. Siek}
+%\authornote{Both authors contributed equally to this research.}
+\email{jsiek@iu.edu}
+%\orcid{1234-5678-9012}
+%% \author{G.K.M. Tobin}
+%% \authornotemark[1]
+%% \email{webmaster@marysville-ohio.com}
+\affiliation{%
+  \institution{Indiana University}
+  \city{Bloomington}
+  \state{IN}
+  \country{USA}
+}
+
+%% \author{Lars Th{\o}rv{\"a}ld}
+%% \affiliation{%
+%%   \institution{The Th{\o}rv{\"a}ld Group}
+%%   \city{Hekla}
+%%   \country{Iceland}}
+%% \email{larst@affiliation.org}
+
+%% \author{Valerie B\'eranger}
+%% \affiliation{%
+%%   \institution{Inria Paris-Rocquencourt}
+%%   \city{Rocquencourt}
+%%   \country{France}
+%% }
+
+%% \author{Aparna Patel}
+%% \affiliation{%
+%%  \institution{Rajiv Gandhi University}
+%%  \city{Doimukh}
+%%  \state{Arunachal Pradesh}
+%%  \country{India}}
+
+%% \author{Huifen Chan}
+%% \affiliation{%
+%%   \institution{Tsinghua University}
+%%   \city{Haidian Qu}
+%%   \state{Beijing Shi}
+%%   \country{China}}
+
+%% \author{Charles Palmer}
+%% \affiliation{%
+%%   \institution{Palmer Research Laboratories}
+%%   \city{San Antonio}
+%%   \state{Texas}
+%%   \country{USA}}
+%% \email{cpalmer@prl.com}
+
+%% \author{John Smith}
+%% \affiliation{%
+%%   \institution{The Th{\o}rv{\"a}ld Group}
+%%   \city{Hekla}
+%%   \country{Iceland}}
+%% \email{jsmith@affiliation.org}
+
+%% \author{Julius P. Kumquat}
+%% \affiliation{%
+%%   \institution{The Kumquat Consortium}
+%%   \city{New York}
+%%   \country{USA}}
+%% \email{jpkumquat@consortium.net}
+
+%%
+%% By default, the full list of authors will be used in the page
+%% headers. Often, this list is too long, and will overlap
+%% other information printed in the page headers. This command allows
+%% the author to define a more concise list
+%% of authors' names for this purpose.
+%\renewcommand{\shortauthors}{Trovato et al.}
+
+%%
+%% The abstract is a short summary of the work to be presented in the
+%% article.
+\begin{abstract}
+We present a proof of correctness in Agda for four nanopasses that
+translate a source language with let binding, integer arithmetic,
+conditional expressions and Booleans into an intermediate language
+that is roughly x86 assembly with variables (prior to register
+allocation).  The most interesting of these four nanopasses is a
+translation of conditional expressions into goto-style control flow
+that uses the continuation-oriented approach of Olivier Danvy's
+one-pass transformation into monadic normal form (2003).
+\end{abstract}
+
+%%
+%% The code below is generated by the tool at http://dl.acm.org/ccs.cfm.
+%% Please copy and paste the code instead of the example below.
+%%
+%% \begin{CCSXML}
+%% <ccs2012>
+%%  <concept>
+%%   <concept_id>00000000.0000000.0000000</concept_id>
+%%   <concept_desc>Do Not Use This Code, Generate the Correct Terms for Your Paper</concept_desc>
+%%   <concept_significance>500</concept_significance>
+%%  </concept>
+%%  <concept>
+%%   <concept_id>00000000.00000000.00000000</concept_id>
+%%   <concept_desc>Do Not Use This Code, Generate the Correct Terms for Your Paper</concept_desc>
+%%   <concept_significance>300</concept_significance>
+%%  </concept>
+%%  <concept>
+%%   <concept_id>00000000.00000000.00000000</concept_id>
+%%   <concept_desc>Do Not Use This Code, Generate the Correct Terms for Your Paper</concept_desc>
+%%   <concept_significance>100</concept_significance>
+%%  </concept>
+%%  <concept>
+%%   <concept_id>00000000.00000000.00000000</concept_id>
+%%   <concept_desc>Do Not Use This Code, Generate the Correct Terms for Your Paper</concept_desc>
+%%   <concept_significance>100</concept_significance>
+%%  </concept>
+%% </ccs2012>
+%% \end{CCSXML}
+
+%% \ccsdesc[500]{Do Not Use This Code~Generate the Correct Terms for Your Paper}
+%% \ccsdesc[300]{Do Not Use This Code~Generate the Correct Terms for Your Paper}
+%% \ccsdesc{Do Not Use This Code~Generate the Correct Terms for Your Paper}
+%% \ccsdesc[100]{Do Not Use This Code~Generate the Correct Terms for Your Paper}
+
+%%
+%% Keywords. The author(s) should pick words that accurately describe
+%% the work being presented. Separate the keywords with commas.
+\keywords{short-cut boolean evaluation, nanopass, verified compilation, mechanized proof, Agda}
+%% A "teaser" image appears between the author and affiliation
+%% information and the body of the document, and typically spans the
+%% page.
+%% \begin{teaserfigure}
+%%   \includegraphics[width=\textwidth]{sampleteaser}
+%%   \caption{Seattle Mariners at Spring Training, 2010.}
+%%   \Description{Enjoying the baseball game from the third-base
+%%   seats. Ichiro Suzuki preparing to bat.}
+%%   \label{fig:teaser}
+%% \end{teaserfigure}
+
+%% \received{20 February 2007}
+%% \received[revised]{12 March 2009}
+%% \received[accepted]{5 June 2009}
+
+%%
+%% This command processes the author and affiliation and title
+%% information and builds the first part of the formatted document.
+\maketitle
+
+\section{Introduction}
+
+The compilation of Boolean expressions and conditionals is a classic
+topic in the compiler literature, going back to a sophisticated
+algorithm of \citet{Aho:1986qf} (presented in the form of an attribute
+grammar) that translates Boolean expressions into gotos. The
+compilation of Boolean expressions and conditionals often occurs at an
+interesting stage in the compilation pipeline, where the intermediate
+language changes from an abstract syntax \emph{tree} into a control
+flow \emph{graph}, or equivalently, an intermediate language with
+\texttt{goto}. Further, when targeting an assembly language such as
+Intel's x86, the naive approach to compiling boolean expressions and
+conditionals produces embarassingly inefficient code. Similar issues
+arise in the compilation of languages such as Haskell, where the
+case-of-case transformation is employed to optimize dispatching on
+algebraic datatypes \citep{PEYTONJONES19983}.
+
+Olivier Danvy, in his paper \emph{A New One-Pass Transformation into
+Monadic Normal Form}~\citep{Danvy:2003fk}, presents a beautiful family
+of structurally recursive functions that translate Boolean expressions
+and conditionals into a monadic normal form that no longer contains
+Boolean expressions or nested conditionals, and where jumps are
+expressed using zero-arity function calls. One of the key parts of
+that translation is in the compilation of a conditional expression
+$(\IF{b}{e_1}{e_2})$, where the expression $b$ is compiled using a
+special function $\mathcal{B}$ that takes two more arguments, the
+generated code for the two branches. Thus, $\mathcal{B}$ can analyze
+the expression $b$ to decide how to generate code for the
+$\mathsf{if}$, or whether it is even necessary.
+\[
+\CE{\IF{b}{e_1}{e_2}} = \CB{b}{\CE{e_1}}{\CE{e_2}}
+\]
+For example, in the simple cases where $b$ is $\TRUE$ or $\FALSE$,
+no branching is needed.
+\begin{align*}
+\CB{\TRUE}{c_1}{c_2} &= c_1 \\
+\CB{\FALSE}{c_1}{c_2} &= c_2
+\end{align*}
+
+My first exposure to these ideas were in Kent Dybvig's compiler
+course~\citep{Dybvig:2010aa}, in which he taught the techniques that
+he employed in building Chez Scheme~\citep{Dybvig:2006aa}, including
+destintation-driven code generation~\cite{Dybvig:1990aa}. The idea
+there was to use an extra parameter in the compilation function to
+indicate how the context would use the result value of an
+expression. The context might (1) ignore the result (and only care
+about the expression's side effects), (2) branch based on interpreting
+its result as a boolean, or (3) actually use the result
+value. Relating this to Olivier's transformation functions, the
+$\mathcal{E}$ function is for contexts that need the actual value and
+the the $\mathcal{B}$ function is for contexts that branch on the
+expression's result. Of course, a pair of function is isomorphic to a
+function on a disjoint union.
+\[
+(A \to B) \times (C \to B) \cong (A + C) \to B
+\]
+
+
+
+
+
+
+%%
+%% The next two lines define the bibliography style to be used, and
+%% the bibliography file.
+\bibliographystyle{ACM-Reference-Format}
+\bibliography{all}
+
+
+%%
+%% If your work has an appendix, this is the place to put it.
+%\appendix
+
+
+\end{document}
+\endinput
+%%
+%% End of file `sample-sigplan.tex'.

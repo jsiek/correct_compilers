@@ -62,16 +62,28 @@ Agda files that prove their correctess.
 
 # Related Work
 
-## Chez Scheme (Dybvig)
+## CompCert (Xavier Leroy et al.)
 
-The above compiler passes all descend from Dybvig's Chez Scheme
-compiler and the course notes that Dybvig used for his compiler course
-at Indiana University.
+The RTLgen pass in CompCert is roughly equivalent to the `explicate`
+pass, including the control-flow translation of Boolean expressions.
+The RTLgen pass translates from the CminorSel intermediate language to
+RTL. The proof of correctness for RTLgen is mechanized in Coq, and
+relates a big-step semantics for CminorSel expressions to a small-step
+semantics for RTL (and relates a small-step semantics for CminorSel
+statement to the semantics of RTL). The CminorSel language still
+includes `let` binding, whereas we translate `let` bindings into
+assignment statements in a prior separate nanopass.
 
 ## A New One-Pass Transformation into Monadic Normal Form (Olivier Danvy, 2003)
 
 The `explicate` pass, at a high level, does the same thing as Olivier's
 one-pass transformation.
+
+## Chez Scheme (Dybvig)
+
+The above compiler passes all descend from Dybvig's Chez Scheme
+compiler and the course notes that Dybvig used for his compiler course
+at Indiana University.
 
 ## Modern Compiler Implementation in Java (Appel and Palsberg, 2003)
 
@@ -85,7 +97,12 @@ an algorithm that is very similar to `explicate`.
 
 ## CakeML
 
-The translation from stackLang to labLang handles the conversion from structured control-flow into gotos, so it serves a similar purpose to `explicate` control. However, CakeML does not use a control-flow translation for Boolean expressions or do the case-of-case optimization, but instead takes the straightforward approach of translation each `if` directly into a conditional jump.
+The translation from stackLang to labLang handles the conversion from
+structured control-flow into gotos, so it serves a similar purpose to
+`explicate` control. However, CakeML does not use a control-flow
+translation of Boolean expressions or do the case-of-case
+optimization, but instead takes the straightforward approach of
+translation each `if` directly into a conditional jump.
 
 ## A Transformation-Based Optimiser for Haskell (Peyton Jones and Santos, 1998)
 
