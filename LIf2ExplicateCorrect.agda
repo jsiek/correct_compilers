@@ -8,6 +8,7 @@ open import Data.Integer using (ℤ; _-_; 0ℤ)
 open import Data.List
 open import Data.List.Properties
 open import Data.Maybe
+open import Data.Bool hiding (Bool)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym)
 open import Reader
 open import Utilities
@@ -149,32 +150,33 @@ explicate-assign-correct : ∀{x : Id}{e : IL-Exp}{t : CStmt}{ρ ρ′ ρ″ : E
 
 explicate-pred-correct : ∀ {e₁ : IL-Exp} {c₁ c₂ c₃ : CStmt} {b : 𝔹} {v : Value} {s s′ s″ : Inputs} {ρ ρ′ ρ″ : Env Value} {B′ B″ B‴ : Blocks}
   → (s , ρ) ⊢ e₁ ⇓ Bool b ⊣ (s′ , ρ′)
-  → (b ≡ true  →  (s′ , ρ′) , B′ ⊢ᶜ c₂ ⇓ v ⊣ (s″ , ρ″))
-  → (b ≡ false  →  (s′ , ρ′) , B′ ⊢ᶜ c₃ ⇓ v ⊣ (s″ , ρ″))
+  → ((s′ , ρ′) , B′ ⊢ᶜ (if b then c₂ else c₃) ⇓ v ⊣ (s″ , ρ″))
+  -- → (b ≡ true  →  (s′ , ρ′) , B′ ⊢ᶜ c₂ ⇓ v ⊣ (s″ , ρ″))
+  -- → (b ≡ false  →  (s′ , ρ′) , B′ ⊢ᶜ c₃ ⇓ v ⊣ (s″ , ρ″))
   → B′ ↝ B″
   → explicate-pred e₁ c₂ c₃ B″ ≡ (c₁ , B‴)
   → (s , ρ) , B‴ ⊢ᶜ c₁ ⇓ v ⊣ (s″ , ρ″)
-explicate-pred-correct {Atom a} {c₁} {c₂} {c₃} {false} {v} {s} {s′} {s″} {ρ} {ρ′} {ρ″} {B′} {B″} {B‴} (⇓atom ia) true→c₂⇓v false→c₃⇓v B′↝B″ refl =
+explicate-pred-correct {Atom a} {c₁} {c₂} {c₃} {false} {v} {s} {s′} {s″} {ρ} {ρ′} {ρ″} {B′} {B″} {B‴} (⇓atom ia) c₂orc₃⇓v B′↝B″ refl =
     let B₂ = B″ ++ [ c₂ ] in
     let B₃ = B₂ ++ [ c₃ ] in
     let B″↝B₂ : B″ ↝ B₂
         B″↝B₂ = [ c₂ ] , refl in
     let B₂↝B₃ : B₂ ↝ B₃
         B₂↝B₃ = [ c₃ ] , refl in
-    let c₃⇓v′ = eval-blocks B′↝B″ (false→c₃⇓v refl) in
+    let c₃⇓v′ = eval-blocks B′↝B″ c₂orc₃⇓v in
     let c₃⇓v″ = eval-blocks B″↝B₂ c₃⇓v′ in
     let c₃⇓v‴ = eval-blocks B₂↝B₃ c₃⇓v″ in
     let nth2 : nth B₃ (length B₂) ≡ just c₃
         nth2 = nth-++-length B₂ [] c₃ in
     ⇓if-false ia refl refl nth2 c₃⇓v‴
-explicate-pred-correct {Atom a} {c₁} {c₂} {c₃} {true} {v} {s} {s′} {s″} {ρ} {ρ′} {ρ″} {B′} {B″} {B‴} (⇓atom ia) true→c₂⇓v false→c₃⇓v B′↝B″ refl =
+explicate-pred-correct {Atom a} {c₁} {c₂} {c₃} {true} {v} {s} {s′} {s″} {ρ} {ρ′} {ρ″} {B′} {B″} {B‴} (⇓atom ia) c₂orc₃⇓v B′↝B″ refl =
     let B₂ = B″ ++ [ c₂ ] in
     let B₃ = B₂ ++ [ c₃ ] in
     let B″↝B₂ : B″ ↝ B₂
         B″↝B₂ = [ c₂ ] , refl in
     let B₂↝B₃ : B₂ ↝ B₃
         B₂↝B₃ = [ c₃ ] , refl in
-    let c₂⇓v′ = eval-blocks B′↝B″ (true→c₂⇓v refl) in
+    let c₂⇓v′ = eval-blocks B′↝B″ c₂orc₃⇓v in
     let c₂⇓v″ = eval-blocks B″↝B₂ c₂⇓v′ in
     let c₂⇓v‴ = eval-blocks B₂↝B₃ c₂⇓v″ in
     let nth2 : nth B₂ (length B″) ≡ just c₂
@@ -182,17 +184,17 @@ explicate-pred-correct {Atom a} {c₁} {c₂} {c₃} {true} {v} {s} {s′} {s″
     let nth3 : nth B₃ (length B″) ≡ just c₂
         nth3 = nth-blocks B₂↝B₃ nth2 in
     ⇓if-true ia refl refl nth3 c₂⇓v‴
-explicate-pred-correct {Sub a₁ a₂} {c₁} {c₂} {c₃} {b} {v} {s} {s′} {s″} {ρ} {ρ′} {ρ″} {B′} {B″} {B‴} (⇓sub x x₁ subv) true→c₂⇓v false→c₃⇓v B′↝B″ refl
+explicate-pred-correct {Sub a₁ a₂} {c₁} {c₂} {c₃} {b} {v} {s} {s′} {s″} {ρ} {ρ′} {ρ″} {B′} {B″} {B‴} (⇓sub x x₁ subv) c₂orc₃⇓v B′↝B″ refl
     with sub-not-bool subv
 ... | ()
-explicate-pred-correct {Eq a₁ a₂} {c₁} {c₂} {c₃} {true} {v} {s} {s′} {s″} {ρ} {ρ′} {ρ″} {B′} {B″} {B‴} (⇓eq ia1 ia2 eq) true→c₂⇓v false→c₃⇓v B′↝B″ refl =
+explicate-pred-correct {Eq a₁ a₂} {c₁} {c₂} {c₃} {true} {v} {s} {s′} {s″} {ρ} {ρ′} {ρ″} {B′} {B″} {B‴} (⇓eq ia1 ia2 eq) c₂orc₃⇓v B′↝B″ refl =
     let B₂ = B″ ++ [ c₂ ] in
     let B₃ = B₂ ++ [ c₃ ] in
     let B″↝B₂ : B″ ↝ B₂
         B″↝B₂ = [ c₂ ] , refl in
     let B₂↝B₃ : B₂ ↝ B₃
         B₂↝B₃ = [ c₃ ] , refl in
-    let c₂⇓v′ = eval-blocks B′↝B″ (true→c₂⇓v refl) in
+    let c₂⇓v′ = eval-blocks B′↝B″ c₂orc₃⇓v in
     let c₂⇓v″ = eval-blocks B″↝B₂ c₂⇓v′ in
     let c₂⇓v‴ = eval-blocks B₂↝B₃ c₂⇓v″ in
     let nth2 : nth B₂ (length B″) ≡ just c₂
@@ -200,7 +202,7 @@ explicate-pred-correct {Eq a₁ a₂} {c₁} {c₂} {c₃} {true} {v} {s} {s′}
     let nth3 : nth B₃ (length B″) ≡ just c₂
         nth3 = nth-blocks B₂↝B₃ nth2 in
    ⇓if-true ia1 ia2 eq nth3 c₂⇓v‴
-explicate-pred-correct {Eq a₁ a₂} {c₁} {c₂} {c₃} {false} {v} {s} {s′} {s″} {ρ} {ρ′} {ρ″} {B′} {B″} {B‴} (⇓eq ia1 ia2 eq) true→c₂⇓v false→c₃⇓v B′↝B″ refl =
+explicate-pred-correct {Eq a₁ a₂} {c₁} {c₂} {c₃} {false} {v} {s} {s′} {s″} {ρ} {ρ′} {ρ″} {B′} {B″} {B‴} (⇓eq ia1 ia2 eq) c₂orc₃⇓v B′↝B″ refl =
     let B₂ = B″ ++ [ c₂ ] in
     let B₃ = B₂ ++ [ c₃ ] in
     let B″↝B₂ : B″ ↝ B₂
@@ -209,87 +211,98 @@ explicate-pred-correct {Eq a₁ a₂} {c₁} {c₂} {c₃} {false} {v} {s} {s′
         B₂↝B₃ = [ c₃ ] , refl in
     let B′↝B₃ : B′ ↝ B₃
         B′↝B₃ = ↝-trans B′↝B″ (↝-trans B″↝B₂ B₂↝B₃) in
-    let B′⊢c₃⇓v = (false→c₃⇓v refl) in
+    let B′⊢c₃⇓v = c₂orc₃⇓v in
     let B₃⊢c₃⇓v = eval-blocks B′↝B₃ B′⊢c₃⇓v in
    ⇓if-false ia1 ia2 eq (nth-create-block{B₂}) B₃⊢c₃⇓v
 
-explicate-pred-correct {Assign x e₁ e₂} {c} {c-thn} {c-els} {b} {v} {s} {s′} {s″} {ρ} {ρ′} {ρ″} {B′} {B″} {B‴} (⇓assign{s′ = s₁}{ρ₁}{n₁ = n₁}{n₂} e₁⇓ e₂⇓) true→c-thn⇓v false→c-els⇓v B′↝B″ refl =
+explicate-pred-correct {Assign x e₁ e₂} {c} {c-thn} {c-els} {b} {v} {s} {s′} {s″} {ρ} {ρ′} {ρ″} {B′} {B″} {B‴} (⇓assign{s′ = s₁}{ρ₁}{n₁ = n₁}{n₂} e₁⇓ e₂⇓) c-thnorc-els⇓v B′↝B″ refl =
     let (c₂ , B₂) = explicate-pred e₂ c-thn c-els B″ in
     let c₂⇓v : (s₁ , update ρ₁ x n₁) , B₂ ⊢ᶜ c₂ ⇓ v ⊣ (s″ , ρ″)
-        c₂⇓v = explicate-pred-correct{c₁ = c₂}{B‴ = B₂} e₂⇓ true→c-thn⇓v false→c-els⇓v B′↝B″ refl in
+        c₂⇓v = explicate-pred-correct{c₁ = c₂}{B‴ = B₂} e₂⇓ c-thnorc-els⇓v B′↝B″ refl in
     explicate-assign-correct e₁⇓ c₂⇓v refl
 
-explicate-pred-correct {If e₁ e₂ e₃} {c} {c-thn} {c-els} {b} {v} {s} {s′} {s″} {ρ} {ρ′} {ρ″} {B′} {B″} {B‴} (⇓if-true e₁⇓true e₂⇓b) true→c-thn⇓v false→c-els⇓v B′↝B″ refl =
-    let B₁ = B″ ++ [ c-thn ] in
-    let lbl-thn = length B″ in
-    let B₂ = B₁ ++ [ c-els ] in
-    let lbl-els = length B₁ in
+explicate-pred-correct {If e₁ e₂ e₃} {c} {c-thn} {c-els} {b} {v} {s} {s′} {s″} {ρ} {ρ′} {ρ″} {B′} {B″} {B‴} (⇓if-true e₁⇓true e₂⇓b) c-thnorc-els⇓v B′↝B″ refl =
+--(λ b-true → let c-thn⇓ = (true→c-thn⇓v b-true) in ⇓goto (nth-blocks B₁↝B₂ nth-thn) (eval-blocks B′↝B₂ c-thn⇓))
+-- (λ b-false → let c-els⇓ = (false→c-els⇓v b-false) in ⇓goto nth-els (eval-blocks B′↝B₂ c-els⇓))
+    let IH2 = explicate-pred-correct {e₂}{B′ = B₂} e₂⇓b (Goal b c-thnorc-els⇓v) ↝-refl refl in
+    explicate-pred-correct {e₁} e₁⇓true IH2 B₃↝B₄ refl
+    where
+    B₁ = B″ ++ [ c-thn ]
+    lbl-thn = length B″
+    B₂ = B₁ ++ [ c-els ]
+    lbl-els = length B₁
 
-    let ep2 = explicate-pred e₂ (Goto lbl-thn) (Goto lbl-els) B₂ in
-    let (c₂ , B₃) = ep2 in
-    let ep3 = explicate-pred e₃ (Goto lbl-thn) (Goto lbl-els) B₃ in
-    let (c₃ , B₄) = ep3 in
+    ep2 = explicate-pred e₂ (Goto lbl-thn) (Goto lbl-els) B₂
+    c₂ = proj₁ ep2
+    B₃ = proj₂ ep2
+    ep3 = explicate-pred e₃ (Goto lbl-thn) (Goto lbl-els) B₃
+    c₃ = proj₁ ep3
+    B₄ = proj₂ ep3
 
-    let B′↝B₁ : B′ ↝ B₁
-        B′↝B₁ = ↝-trans B′↝B″ ([ c-thn ] , refl) in
-    let B₁↝B₂ : B₁ ↝ B₂
-        B₁↝B₂ = [ c-els ] , refl in
-    let B′↝B₂ : B′ ↝ B₂
-        B′↝B₂ = ↝-trans B′↝B₁ B₁↝B₂ in
-    let B₃↝B₄ : B₃ ↝ B₄
-        B₃↝B₄ = explicate-pred-blocks {e₃}{Goto lbl-thn}{Goto lbl-els} refl in
+    B′↝B₁ : B′ ↝ B₁
+    B′↝B₁ = ↝-trans B′↝B″ ([ c-thn ] , refl)
+    B₁↝B₂ : B₁ ↝ B₂
+    B₁↝B₂ = [ c-els ] , refl 
+    B′↝B₂ : B′ ↝ B₂
+    B′↝B₂ = ↝-trans B′↝B₁ B₁↝B₂
+    B₃↝B₄ : B₃ ↝ B₄
+    B₃↝B₄ = explicate-pred-blocks {e₃}{Goto lbl-thn}{Goto lbl-els} refl
 
-    let nth-thn : nth B₁ lbl-thn ≡ just c-thn
-        nth-thn = nth-create-block{B″} in
+    Goal : ∀ b
+        → (s′ , ρ′) , B′ ⊢ᶜ if b then c-thn else c-els ⇓ v ⊣ (s″ , ρ″)
+        → (s′ , ρ′) , B₂ ⊢ᶜ if b then Goto lbl-thn else Goto lbl-els ⇓ v ⊣ (s″ , ρ″)
+    Goal false c-thnorc-els⇓v =
+        let nth-els : nth B₂ lbl-els ≡ just c-els
+            nth-els = nth-create-block{B₁} in
+        ⇓goto nth-els (eval-blocks B′↝B₂ c-thnorc-els⇓v)
+    Goal true c-thnorc-els⇓v =
+        let nth-thn : nth B₁ lbl-thn ≡ just c-thn
+            nth-thn = nth-create-block{B″} in
+        ⇓goto (nth-blocks B₁↝B₂ nth-thn) (eval-blocks B′↝B₂ c-thnorc-els⇓v)
 
-    let nth-els : nth B₂ lbl-els ≡ just c-els
-        nth-els = nth-create-block{B₁} in
 
-    let IH2 = explicate-pred-correct {e₂}{B′ = B₂} e₂⇓b (λ b-true → let c-thn⇓ = (true→c-thn⇓v b-true) in ⇓goto (nth-blocks B₁↝B₂ nth-thn) (eval-blocks B′↝B₂ c-thn⇓))
-                                               (λ b-false → let c-els⇓ = (false→c-els⇓v b-false) in ⇓goto nth-els (eval-blocks B′↝B₂ c-els⇓))
-                                               ↝-refl refl in
-    explicate-pred-correct {e₁} e₁⇓true (λ _ → IH2) (λ ()) B₃↝B₄ refl
-
-explicate-pred-correct {If e₁ e₂ e₃} {c} {c-thn} {c-els} {b} {v} {s} {s′} {s″} {ρ} {ρ′} {ρ″} {B′} {B″} {B‴} (⇓if-false e₁⇓false e₃⇓b) true→c-thn⇓v false→c-els⇓v B′↝B″ refl =
-
-    let B₁ = B″ ++ [ c-thn ] in
-    let lbl-thn = length B″ in
-    let B₂ = B₁ ++ [ c-els ] in
-    let lbl-els = length B₁ in
-
-    let ep2 = explicate-pred e₂ (Goto lbl-thn) (Goto lbl-els) B₂ in
-    let (c₂ , B₃) = ep2 in
-    let ep3 = explicate-pred e₃ (Goto lbl-thn) (Goto lbl-els) B₃ in
-    let (c₃ , B₄) = ep3 in
-
-    let B′↝B₁ : B′ ↝ B₁
-        B′↝B₁ = ↝-trans B′↝B″ ([ c-thn ] , refl) in
-    let B₁↝B₂ : B₁ ↝ B₂
-        B₁↝B₂ = [ c-els ] , refl in
-    let B′↝B₂ : B′ ↝ B₂
-        B′↝B₂ = ↝-trans B′↝B₁ B₁↝B₂ in
-
-    let B₂↝B₃ = (explicate-pred-blocks {e₂}{Goto lbl-thn}{Goto lbl-els} refl) in
-    
-    let B′↝B₃ : B′ ↝ B₃
-        B′↝B₃ = ↝-trans B′↝B₂ B₂↝B₃ in
-
-    let B₁↝B₃ : B₁ ↝ B₃
-        B₁↝B₃ = ↝-trans B₁↝B₂ B₂↝B₃ in
-
-    let nth-thn : nth B₁ lbl-thn ≡ just c-thn
-        nth-thn = nth-create-block{B″} in
-
-    let nth-els : nth B₂ lbl-els ≡ just c-els
-        nth-els = nth-create-block{B₁} in
-
+explicate-pred-correct {If e₁ e₂ e₃} {c} {c-thn} {c-els} {b} {v} {s} {s′} {s″} {ρ} {ρ′} {ρ″} {B′} {B″} {B‴} (⇓if-false e₁⇓false e₃⇓b) c-thnorc-els⇓v B′↝B″ refl =
     let IH3 = explicate-pred-correct {e₃}{B′ = B₃} e₃⇓b
-               (λ b-true → let c-thn⇓ = (true→c-thn⇓v b-true) in ⇓goto (nth-blocks B₁↝B₃ nth-thn) (eval-blocks B′↝B₃ c-thn⇓))
-               (λ b-false → let c-els⇓ = (false→c-els⇓v b-false) in ⇓goto (nth-blocks B₂↝B₃ nth-els) (eval-blocks B′↝B₃ c-els⇓))
+               (Goal b c-thnorc-els⇓v)
                ↝-refl refl in
+    explicate-pred-correct {e₁} e₁⇓false IH3 ↝-refl refl
+    where
+    B₁ = B″ ++ [ c-thn ]
+    lbl-thn = length B″
+    B₂ = B₁ ++ [ c-els ]
+    lbl-els = length B₁
 
-    explicate-pred-correct {e₁} e₁⇓false (λ ()) (λ _ → IH3) ↝-refl refl
+    ep2 = explicate-pred e₂ (Goto lbl-thn) (Goto lbl-els) B₂
+    c₂ = proj₁ ep2
+    B₃ = proj₂ ep2
+    ep3 = explicate-pred e₃ (Goto lbl-thn) (Goto lbl-els) B₃
+    c₃ = proj₁ ep3
+    B₄ = proj₂ ep3
 
+    B′↝B₁ : B′ ↝ B₁
+    B′↝B₁ = ↝-trans B′↝B″ ([ c-thn ] , refl)
+    B₁↝B₂ : B₁ ↝ B₂
+    B₁↝B₂ = [ c-els ] , refl
+    B′↝B₂ : B′ ↝ B₂
+    B′↝B₂ = ↝-trans B′↝B₁ B₁↝B₂
+    B₂↝B₃ = (explicate-pred-blocks {e₂}{Goto lbl-thn}{Goto lbl-els} refl)
+    B′↝B₃ : B′ ↝ B₃
+    B′↝B₃ = ↝-trans B′↝B₂ B₂↝B₃
+    B₁↝B₃ : B₁ ↝ B₃
+    B₁↝B₃ = ↝-trans B₁↝B₂ B₂↝B₃
+    
+    Goal : ∀ b
+       → (s′ , ρ′) , B′ ⊢ᶜ if b then c-thn else c-els ⇓ v ⊣ (s″ , ρ″)
+       → (s′ , ρ′) , B₃ ⊢ᶜ if b then Goto (create-block c-thn B″ .proj₁) else
+                            Goto (create-block c-els (create-block c-thn B″ .proj₂) .proj₁) ⇓ v ⊣ (s″ , ρ″)
+    Goal false c-thnorc-els⇓v =
+        let nth-els : nth B₂ lbl-els ≡ just c-els
+            nth-els = nth-create-block{B₁} in
+         ⇓goto (nth-blocks B₂↝B₃ nth-els) (eval-blocks B′↝B₃ c-thnorc-els⇓v)
+    Goal true c-thnorc-els⇓v =
+        let nth-thn : nth B₁ lbl-thn ≡ just c-thn
+            nth-thn = nth-create-block{B″} in
+         ⇓goto (nth-blocks B₁↝B₃ nth-thn) (eval-blocks B′↝B₃ c-thnorc-els⇓v)
 
 explicate-assign-correct {x} {Atom a}{t}{ρ}{ρ′}{ρ″}{s}{s′}{s″}{B}{B′}{c}{n}{v} (⇓atom ia) t⇓v refl =
   ⇓assign Goal t⇓v
@@ -328,7 +341,7 @@ explicate-assign-correct {x}{ (If e₁ e₂ e₃)}{ t}{ ρ}{ ρ′}{ ρ″}{ s}{
     let t⇓v′ = eval-blocks ([ t ] , refl) t⇓v in
     let IH2 = explicate-assign-correct e₂⇓v₂ (⇓goto (nth-++-length B [] t) t⇓v′) ea2 in
     let B′↝B″ = explicate-assign-blocks {x}{e₃}{Goto (length B)}{c₃} ea3 in
-    explicate-pred-correct e₁⇓v₁ (λ _ → IH2) (λ ()) B′↝B″ ep1
+    explicate-pred-correct e₁⇓v₁ IH2 B′↝B″ ep1
 
 explicate-assign-correct {x}{ (If e₁ e₂ e₃)}{ t}{ ρ}{ ρ′}{ ρ″}{ s}{ s′}{ s″}{ B}{ B‴}{ c}{ n}{ v} (⇓if-false{sρ′ = (s₁ , ρ₁)} e₁⇓v₁ e₃⇓v₃) t⇓v ep1
     with explicate-assign x e₂ (Goto (length B)) (B ++ [ t ]) in ea2
@@ -347,7 +360,7 @@ explicate-assign-correct {x}{ (If e₁ e₂ e₃)}{ t}{ ρ}{ ρ′}{ ρ″}{ s}{
     let nth2 : nth B′ (length B) ≡ just t
         nth2 = nth-blocks B₁↝B′ nth1 in
     let IH3 = explicate-assign-correct e₃⇓v₃ (⇓goto nth2 t⇓v′) ea3 in
-    explicate-pred-correct e₁⇓v₁ (λ ()) (λ _ → IH3) ↝-refl ep1
+    explicate-pred-correct e₁⇓v₁ IH3 ↝-refl ep1
 
 explicate-tail-correct : ∀ {e : IL-Exp}{ρ ρ' : Env Value}{s s' : Inputs}{B B′ : List CStmt}{c : CStmt}{v : Value}
   → (s , ρ) ⊢ e ⇓ v ⊣ (s' , ρ')
@@ -378,12 +391,12 @@ explicate-tail-correct {(If e₁ e₂ e₃)}{ ρ}{ ρ″}{ s}{ s″}{ B}{ B′}{
     let c₂⇓ = explicate-tail-correct {e₂} e₂⇓v refl in
     let B₁↝B₂ : B₁ ↝ B₂
         B₁↝B₂ = explicate-tail-blocks {e₃} refl in
-    explicate-pred-correct {e₁} e₁⇓true (λ _ → c₂⇓) (λ ()) B₁↝B₂ refl
+    explicate-pred-correct {e₁} e₁⇓true c₂⇓ B₁↝B₂ refl
 explicate-tail-correct {(If e₁ e₂ e₃)}{ ρ}{ ρ″}{ s}{ s″}{ B}{ B′}{ c}{ v} (⇓if-false{sρ′ = (s′ , ρ′)} e₁⇓false e₃⇓v) refl =
     let (c₂ , B₁) = explicate-tail e₂ B in
     let (c₃ , B₂) = explicate-tail e₃ B₁ in
     let c₃⇓ = explicate-tail-correct {e₃} e₃⇓v refl in
-    explicate-pred-correct {e₁} e₁⇓false (λ ()) (λ _ → c₃⇓) ↝-refl refl
+    explicate-pred-correct {e₁} e₁⇓false c₃⇓ ↝-refl refl
 
 explicate-correct : ∀ (p : IL-Prog) (s : Inputs) (v : Value)
   → interp-ilprog p s v
