@@ -332,9 +332,10 @@ function calls. One of the key parts of that translation is in the
 compilation of a conditional expression such as $(\IF{b}{e_1}{e_2})$,
 where the expression $b$ is compiled using a special function
 $\mathcal{B}$ that takes two more arguments, the generated code for
-the two branches. Thus, $\mathcal{B}$ can analyze the expression $b$
-to decide how to generate code for the $\mathsf{if}$, or whether an
-$\mathsf{if}$ is even necessary.
+the two branches, that is, for the two continuations of $b$. Thus,
+$\mathcal{B}$ can analyze the expression $b$ to decide how to generate
+code for the $\mathsf{if}$, or whether an $\mathsf{if}$ is even
+necessary.
 \[
 \CE{\IF{b}{e_1}{e_2}} = \CB{b}{\CE{e_1}}{\CE{e_2}}
 \]
