@@ -6,7 +6,8 @@ open import Data.Product
 open import Data.Integer using (ℤ; _-_; 0ℤ)
 open import Data.List
 open import Data.Maybe
-open import Relation.Binary.PropositionalEquality using (_≡_; refl)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym)
+open import Relation.Nullary using (Dec; yes; no)
 open import Utilities
 open import LIf2
 
@@ -75,13 +76,60 @@ rco-correct-exp (Sub e₁ e₂) ρ = extensionality Goal
   Goal : (s : Inputs) →
          interp-mon (rco (Sub e₁ e₂)) ρ s ≡ interp-exp (Sub e₁ e₂) ρ s
   Goal s
-      rewrite rco-correct-exp e₁ ρ
+  -- Complex version
+      with rco e₁ in m1 | rco e₂ in m2
+  ... | m₁ | m₂
+      with atomic? m₁ | atomic? m₂
+  ... | yes (atomic a₁) | yes (atomic a₂)
+      rewrite sym (rco-correct-exp e₁ ρ) | sym (rco-correct-exp e₂ ρ)
+      | m1 | m2
+      = refl
+  Goal s | m₁ | m₂
+      | no cmplx₁ | yes (atomic a₂)
+      rewrite sym m1 | rco-correct-exp e₁ ρ
+      with interp-exp e₁ ρ s
+  ... | nothing = refl
+  ... | just (v₁ , s')
+      rewrite sym (rco-correct-exp e₂ ρ) | m2
+      rewrite interp-shift-atm a₂ v₁ [] ρ
+      = refl
+  Goal s | m₁ | m₂
+      | yes (atomic a₁) | no cmplx₂
+      rewrite sym (rco-correct-exp e₁ ρ) | m1
+      rewrite sym m2 | rco-correct-exp e₂ ρ
+      with interp-atm a₁ ρ in ia1
+  ... | nothing
+      with interp-exp e₂ ρ s
+  ... | nothing = refl
+  ... | just (v₂ , s')
+      rewrite interp-shift-atm a₁ v₂ [] ρ | ia1
+      = refl
+  Goal s | m₁ | m₂
+      | yes (atomic a₁) | no cmplx₂
+      | just v₁
+      with interp-exp e₂ ρ s
+  ... | nothing = refl
+  ... | just (v₂ , s')
+      rewrite interp-shift-atm a₁ v₂ [] ρ | ia1
+      = refl
+  Goal s | m₁ | m₂
+      | no cmplx₁ | no cmplx₂
+      rewrite sym m1 | sym m2 | rco-correct-exp e₁ ρ
       with interp-exp e₁ ρ s
   ... | nothing = refl
   ... | just (v₁ , s')
       rewrite interp-shift-mon (rco e₂) v₁ [] ρ
       | rco-correct-exp e₂ ρ
       = refl
+
+  -- Simple version
+  --     rewrite rco-correct-exp e₁ ρ
+  --     with interp-exp e₁ ρ s
+  -- ... | nothing = refl
+  -- ... | just (v₁ , s')
+  --     rewrite interp-shift-mon (rco e₂) v₁ [] ρ
+  --     | rco-correct-exp e₂ ρ
+  --     = refl
 rco-correct-exp (Eq e₁ e₂) ρ = extensionality Goal
   where
   Goal : (s : Inputs) →
@@ -125,5 +173,5 @@ rco-correct-exp (If e₁ e₂ e₃) ρ = extensionality Goal
       = refl
 
 rco-correct : ∀ (e : Exp) (s : Inputs)
-  → interp-LMonVar (rco e) s ≡ interp-LIf e s 
+  → interp-LMonIf (rco e) s ≡ interp-LIf e s 
 rco-correct e s rewrite rco-correct-exp e [] = refl

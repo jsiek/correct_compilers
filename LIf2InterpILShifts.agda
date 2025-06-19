@@ -75,7 +75,7 @@ interp-shifts-atm (Var x) ρ₁ ρ₂ ρ₃ = nth-++-shifts-var ρ₁ ρ₂ ρ�
 ⇓eq-elim (⇓eq{n₁ = n₁}{n₂} eq1 eq2 eq3) =
     n₁ , n₂ , eq1 , eq2 , eq3 , refl , refl 
   
-⇓shifts : ∀ {e : IL-Exp}{v : Value} {s s′ : Inputs} {ρ₁ ρ′₁ ρ₂ ρ₃ ρ′₃ : Env Value} 
+⇓shifts : ∀ {e : Imp-Exp}{v : Value} {s s′ : Inputs} {ρ₁ ρ′₁ ρ₂ ρ₃ ρ′₃ : Env Value} 
   → (s , ρ₁ ++ ρ₃) ⊢ e ⇓ v ⊣ (s′ , ρ′₁ ++ ρ′₃)
   → length ρ′₁ ≡ length ρ₁
   → (s , ρ₁ ++ ρ₂ ++ ρ₃) ⊢

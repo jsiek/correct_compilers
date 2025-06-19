@@ -87,7 +87,7 @@ lift-locals-mon-correct (Let m₁ m₂) e s s′ v ρ₁ ρ₂ n im lm lρ₁
 
 lift-locals-correct : ∀ (m : Mon) (s : Inputs) (v : ℤ)
   → interp-LMonVar m s ≡ just v
-  → interp-ilprog (lift-locals m) s v
+  → interp-imp (lift-locals m) s v
 lift-locals-correct m s v im
     with lift-locals-mon m in lm
 ... | n , e

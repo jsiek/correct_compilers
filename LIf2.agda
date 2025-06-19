@@ -12,6 +12,7 @@ open import Relation.Binary.PropositionalEquality
 open import Agda.Builtin.Bool renaming (Bool to 𝔹)
 open import Reader
 open import Utilities
+open import Relation.Nullary using (Dec; yes; no)
 
 ----------------- Definition of LIf ----------------------------
 
@@ -71,7 +72,7 @@ interp-exp (If e₁ e₂ e₃) ρ =
 interp-LIf : Exp → Inputs → Maybe Value
 interp-LIf e s = run (interp-exp e []) s
 
------------------ Definition of LMonVar ----------------------------
+----------------- Definition of LMonIf ----------------------------
 
 data Atm : Set where
   Num : ℤ → Atm 
@@ -111,13 +112,18 @@ interp-mon (If e₁ e₂ e₃) ρ =
     ; (Bool false) → interp-mon e₃ ρ
     ; (Int n) → error }
 
-interp-LMonVar : Mon → Inputs → Maybe Value
-interp-LMonVar m s = run (interp-mon m []) s
+interp-LMonIf : Mon → Inputs → Maybe Value
+interp-LMonIf m s = run (interp-mon m []) s
 
 shift-atm : Atm → ℕ → Atm
 shift-atm (Num x) c = Num x
 shift-atm (Bool b) c = Bool b
 shift-atm (Var x) c = Var (shift-var x c)
+
+shifts-atm : Atm → ℕ → ℕ → Atm
+shifts-atm (Num x) c n = Num x
+shifts-atm (Bool b) c n = Bool b
+shifts-atm (Var x) c n = Var (shifts-var x c n)
 
 shift-mon : Mon → ℕ → Mon
 shift-mon (Atom atm) c = Atom (shift-atm atm c)
@@ -127,16 +133,68 @@ shift-mon (Eq a₁ a₂) c = Eq (shift-atm a₁ c) (shift-atm a₂ c)
 shift-mon (Let m₁ m₂) c = Let (shift-mon m₁ c) (shift-mon m₂ (suc c))
 shift-mon (If m₁ m₂ m₃) c = If (shift-mon m₁ c) (shift-mon m₂ c) (shift-mon m₃ c)
 
+down-atm : Atm → ℕ → Atm
+down-atm (Num x) c = Num x
+down-atm (Bool b) c = Bool b
+down-atm (Var x) c = Var (down-var x c)
+
+down-mon : Mon → ℕ → Mon
+down-mon (Atom atm) c = Atom (down-atm atm c)
+down-mon Read c = Read
+down-mon (Sub a₁ a₂) c = Sub (down-atm a₁ c) (down-atm a₂ c)
+down-mon (Eq a₁ a₂) c = Eq (down-atm a₁ c) (down-atm a₂ c)
+down-mon (Let m₁ m₂) c = Let (down-mon m₁ c) (down-mon m₂ (suc c))
+down-mon (If m₁ m₂ m₃) c = If (down-mon m₁ c) (down-mon m₂ c) (down-mon m₃ c)
+
 ----------------- Remove Complex Operands ----------------------------
+
+data Atomic : Mon → Set where
+  atomic : ∀ (a : Atm) → Atomic (Atom a)
+
+atomic? : (m : Mon) → Dec (Atomic m)
+atomic? (Atom a) = yes (atomic a)
+atomic? Read = no λ ()
+atomic? (Sub a₁ a₂) = no λ ()
+atomic? (Eq a₁ a₂) = no λ ()
+atomic? (Let m₁ m₂) = no λ ()
+atomic? (If m₁ m₂ m₃) = no λ ()
+
+-- The following isn't quite right because it doesn't shift things properly.
+let-complex : Mon → (Atm → Mon) → Mon
+let-complex m body
+    with atomic? m
+... | yes (atomic a) = body a
+... | no cmplx = Let m (body (Var 0))
 
 rco : Exp → Mon
 rco (Num x) = Atom (Num x)
 rco (Bool b) = Atom (Bool b)
 rco Read = Read
-rco (Sub e₁ e₂) =
-   Let (rco e₁)
-     (Let (shift-mon (rco e₂) zero)
-       (Sub (Var (suc (zero))) (Var zero)))
+rco (Sub e₁ e₂)
+    -- Fancy version:
+    -- let-complex (rco e₁) 
+    -- λ a₁ → let-complex (shift-mon (rco e₂) 0) 
+    -- λ a₂ → Sub a₁ a₂
+    
+    -- Complex version:
+    with rco e₁ | rco e₂
+... | m₁ | m₂
+    with atomic? m₁ | atomic? m₂
+... | yes (atomic a₁) | yes (atomic a₂) =
+      Sub a₁ a₂
+... | no cmplx₁ | yes (atomic a₂) =
+      Let (rco e₁) (Sub (Var zero) (shift-atm a₂ 0))
+... | yes (atomic a₁) | no cmplx₂ =
+      Let (rco e₂) (Sub (shift-atm a₁ 0) (Var 0))
+... | no cmplx₁ | no cmplx₂ = 
+      Let m₁
+        (Let (shift-mon m₂ 0)
+          (Sub (Var 1) (Var 0)))
+          
+   -- Simple version:
+   -- Let (rco e₁)
+   --   (Let (shift-mon (rco e₂) 0)
+   --     (Sub (Var 1) (Var 0)))
 rco (Eq e₁ e₂) =
    Let (rco e₁)
     (Let (shift-mon (rco e₂) zero)
@@ -147,21 +205,21 @@ rco (If e₁ e₂ e₃) = If (rco e₁) (rco e₂) (rco e₃)
 
 ----------------- Definition of IL ----------------------------
 
-data IL-Exp : Set where
-  Atom : Atm → IL-Exp
-  Read : IL-Exp
-  Sub : Atm → Atm → IL-Exp
-  Eq : Atm → Atm → IL-Exp
-  Assign : Id → IL-Exp → IL-Exp → IL-Exp
-  If : IL-Exp → IL-Exp → IL-Exp → IL-Exp
+data Imp-Exp : Set where
+  Atom : Atm → Imp-Exp
+  Read : Imp-Exp
+  Sub : Atm → Atm → Imp-Exp
+  Eq : Atm → Atm → Imp-Exp
+  Assign : Id → Imp-Exp → Imp-Exp → Imp-Exp
+  If : Imp-Exp → Imp-Exp → Imp-Exp → Imp-Exp
   
-data IL-Prog : Set where
-  Program : ℕ → IL-Exp → IL-Prog
+data Imp-Prog : Set where
+  Program : ℕ → Imp-Exp → Imp-Prog
 
-StateIL : Set
-StateIL = Inputs × List Value
+StateImp : Set
+StateImp = Inputs × Env Value
 
-data _⊢_⇓_⊣_ : StateIL → IL-Exp → Value → StateIL → Set where
+data _⊢_⇓_⊣_ : StateImp → Imp-Exp → Value → StateImp → Set where
   ⇓atom : ∀{s ρ a v}
      → interp-atm a ρ ≡ just v
      → (s , ρ) ⊢ Atom a ⇓ v ⊣ (s , ρ)
@@ -190,18 +248,14 @@ data _⊢_⇓_⊣_ : StateIL → IL-Exp → Value → StateIL → Set where
      → sρ′ ⊢ e₃ ⇓ v₃ ⊣ sρ″ 
      → sρ ⊢ If e₁ e₂ e₃ ⇓ v₃ ⊣ sρ″ 
 
-interp-ilprog : IL-Prog → Inputs → Value → Set
-interp-ilprog (Program n e) s v =
-    Σ[ sρ′ ∈ Inputs × Env Value ] (s , (replicate n (Int 0ℤ))) ⊢ e ⇓ v ⊣ sρ′ 
+interp-imp : Imp-Prog → Inputs → Value → Set
+interp-imp (Program n e) s v = Σ[ s′ ∈ StateImp ] (s , ρ) ⊢ e ⇓ v ⊣ s′
+    where
+    ρ = replicate n (Int 0ℤ)
 
 ----------------- Lift Locals ----------------------------
 
-shifts-atm : Atm → ℕ → ℕ → Atm
-shifts-atm (Num x) c n = Num x
-shifts-atm (Bool b) c n = Bool b
-shifts-atm (Var x) c n = Var (shifts-var x c n)
-
-shifts-ilexp : IL-Exp → ℕ → ℕ → IL-Exp
+shifts-ilexp : Imp-Exp → ℕ → ℕ → Imp-Exp
 shifts-ilexp (Atom atm) c n = Atom (shifts-atm atm c n)
 shifts-ilexp Read c n = Read
 shifts-ilexp (Sub a₁ a₂) c n =
@@ -224,7 +278,7 @@ shifts-ilexp (If e₁ e₂ e₃) c n =
 --   is represented as
 --   i , m
 
-lift-locals-mon : Mon → ℕ × IL-Exp
+lift-locals-mon : Mon → ℕ × Imp-Exp
 lift-locals-mon (Atom a) = 0 , (Atom a)
 lift-locals-mon Read = 0 , Read
 lift-locals-mon (Sub a₁ a₂) = 0 , (Sub a₁ a₂)
@@ -248,7 +302,7 @@ lift-locals-mon (If m₁ m₂ m₃)
     let e′₃ = shifts-ilexp e₃ k (i + j) in
     (i + j + k) , (If e′₁ e′₂ e′₃)
     
-lift-locals : Mon → IL-Prog
+lift-locals : Mon → Imp-Prog
 lift-locals m
     with lift-locals-mon m
 ... | n , e = Program n e    
@@ -282,7 +336,7 @@ interp-CExp (Eq a₁ a₂) ρ =
   λ v₁ → try (interp-atm a₂ ρ) then
   λ v₂ → try (equal v₁ v₂)
 
-data _,_⊢ᶜ_⇓_⊣_ : StateIL → List CStmt → CStmt → Value → StateIL → Set where
+data _,_⊢ᶜ_⇓_⊣_ : StateImp → List CStmt → CStmt → Value → StateImp → Set where
   ⇓return : ∀{s s' ρ B e v}
      → interp-CExp e ρ s ≡ just (v , s')
      → (s , ρ) , B ⊢ᶜ Return e ⇓ v ⊣ (s' , ρ)
@@ -311,7 +365,7 @@ data _,_⊢ᶜ_⇓_⊣_ : StateIL → List CStmt → CStmt → Value → StateIL
 
 interp-prog : CProg → Inputs → Value → Set
 interp-prog (Program n l B) s v =
-    Σ[ s′ ∈ StateIL ] (s , (replicate n (Int 0ℤ))) , B ⊢ᶜ Goto l ⇓ v ⊣ s′ 
+    Σ[ s′ ∈ StateImp ] (s , (replicate n (Int 0ℤ))) , B ⊢ᶜ Goto l ⇓ v ⊣ s′ 
 
 ----------------- Explicate Control ----------------------------
 
@@ -329,9 +383,9 @@ _thenB_ : ∀{A B : Set} → Blocker A → (A → Blocker B) → Blocker B
 create-block : CStmt → Blocker Id
 create-block t B = length B , (B ++ [ t ])
 
-explicate-assign : Id → IL-Exp → CStmt → Blocker CStmt
-explicate-tail : IL-Exp → Blocker CStmt
-explicate-pred : IL-Exp → CStmt → CStmt → Blocker CStmt
+explicate-assign : Id → Imp-Exp → CStmt → Blocker CStmt
+explicate-tail : Imp-Exp → Blocker CStmt
+explicate-pred : Imp-Exp → CStmt → CStmt → Blocker CStmt
 
 explicate-assign x (Atom a) rest = returnB (Assign x (Atom a) rest)
 explicate-assign x Read rest = returnB (Assign x Read rest)
@@ -379,7 +433,7 @@ explicate-pred (If e₁ e₂ e₃) thn els =
    λ t₃ → explicate-pred e₁ t₂ t₃
 
 
-explicate : IL-Prog → CProg
+explicate : Imp-Prog → CProg
 explicate (Program n e)
     with ((explicate-tail e) thenB
           (λ t → create-block t)) []

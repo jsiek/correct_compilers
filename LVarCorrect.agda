@@ -19,5 +19,3 @@ compile-correct e s v ie =
    let i-lift = lift-locals-correct (rco e) s v i-rco in
    let i-exp = explicate-correct (lift-locals (rco e)) s v i-lift in
    select-inst-correct (explicate (lift-locals (rco e))) s v i-exp
-
-

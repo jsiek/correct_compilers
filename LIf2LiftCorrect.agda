@@ -17,7 +17,7 @@ open import LIf2InterpILShifts
 
 --------------- Proof of correctness for Lift Locals -------------------
 
-lift-locals-mon-correct : ∀ (m : Mon) (e : IL-Exp) (s s′ : Inputs) (v : Value) (ρ₁ ρ₂ : Env Value) (n : ℕ)
+lift-locals-mon-correct : ∀ (m : Mon) (e : Imp-Exp) (s s′ : Inputs) (v : Value) (ρ₁ ρ₂ : Env Value) (n : ℕ)
   → interp-mon m ρ₂ s ≡ just (v , s′)
   → lift-locals-mon m ≡ (n , e)
   → length ρ₁ ≡ n
@@ -179,8 +179,8 @@ lift-locals-mon-correct (Let m₁ m₂) e s s′ v ρ₁ ρ₂ n im lm lρ₁
         = refl
 
 lift-locals-correct : ∀ (m : Mon) (s : Inputs) (v : Value)
-  → interp-LMonVar m s ≡ just v
-  → interp-ilprog (lift-locals m) s v
+  → interp-LMonIf m s ≡ just v
+  → interp-imp (lift-locals m) s v
 lift-locals-correct m s v im
     with lift-locals-mon m in lm
 ... | n , e

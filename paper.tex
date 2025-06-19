@@ -105,12 +105,46 @@
 %% the next command will enable that style.
 %%\citestyle{acmauthoryear}
 
+\usepackage{mathpartir}
+\usepackage{listings}
+\usepackage{stmaryrd}
+
+\usepackage[utf8]{inputenc}
+%\usepackage[T1]{fontenc}
+
+%\usepackage[verbose]{newunicodechar}
+%% \newunicodechar{ℕ}{\ensuremath{\mathbb{N}~}}
+%% \newunicodechar{𝔹}{\ensuremath{\mathbb{B}~}}
+%\newunicodechar{ℤ}{\ensuremath{\mathbb{Z}~}}
+%\newunicodechar{→}{\ensuremath{~\to~}}
+%\newunicodechar{×}{\ensuremath{~\times~}}
+
+\newcommand{\LangIf}{$\Lang_{\mathsf{If}}$} %R2
+\newcommand{\RCO}{\mathit{mon}} % output of remove-complex-opera*
+\newcommand{\LangIfANF}{\ensuremath{\Lang^{\RCO}_{\mathsf{if}}}} %R2
+\newcommand{\CLang}{\mathcal{C}}
+\newcommand{\LangCIf}{$\CLang_{\mathsf{If}}$} %C1
+
 \newcommand{\TRUE}[0]{\mathsf{true}}
 \newcommand{\FALSE}[0]{\mathsf{false}}
 \newcommand{\IF}[3]{\mathsf{if}\,#1\,\mathsf{then}\,#2\,\mathsf{else}\,#3}
 
 \newcommand{\CE}[1]{\mathcal{E} \llbracket #1 \rrbracket}
 \newcommand{\CB}[3]{\mathcal{B} \llbracket #1 \rrbracket ( #2, #3 )}
+
+\lstset{%
+language=Python,
+basicstyle=\ttfamily\small,
+morekeywords={match,case,bool,int,let,begin,if,else,closure},
+deletekeywords={},
+escapechar=|,
+mathescape=true,
+columns=flexible,
+%moredelim=[is][\color{red}]{~}{~},
+showstringspaces=false,
+%inputencoding=utf8
+literate={→}{{\to}}1,
+}
 
 %%
 %% end of the preamble, start of the body of the document source.
@@ -326,7 +360,7 @@ and the $\mathcal{B}$ function is for contexts that branch on the
 expression's result. Of course, a pair of functions is isomorphic to a
 function on a disjoint union.
 \[
-(A \to C) \times (B \to C) \cong (A + B) \to C
+(A → C) × (B → C) ≅ (A + B) → C
 \]
 
 The CompCert compiler \citep{Leroy:2006fe} (a compiler for C verified
@@ -380,10 +414,376 @@ keeps the name Explicate Control.
 \item Select Instructions
 \end{enumerate}
 
+TODO: roadmap
 
 %% differs in that I also use a big-step semantics for the register
 %% transfer language (instead of small step), which streamlines some of
 %% the reasoning.
+
+\section{The Languages}
+
+In this section we describe how we formalize the syntax and semantics
+of the source language and four intermediate languages in Agda:
+\begin{enumerate}
+\item Integers, Booleans, \texttt{let}, and \texttt{if}
+\item Monadic Normal Form
+\item Imperative with Structured Control Flow
+\item A C-like language with \emph{goto}
+\item X86 assembly but with variables
+\end{enumerate}
+These languages and there semantics are quite standard. However, there
+are many other intermediate languages in the literature to choose
+from, so why these languages, and why in this particular order?  The
+answer is that they happen to represent the images of the four
+nanopasses.  So then the question becomes, why do we choose to order
+the nanopasses in this way? The main thing to consider is that some
+passes make later passes easier because they remove a language feature
+that would have been complicated to handle. For example, the Lift
+Locals pass removed \texttt{let}, and I found \texttt{let} difficult
+to deal with in the proof of correctness for Explicate Control
+(\texttt{let} is relatively easy to handle in the code for Explicate
+Control). The other thing to consider is that some compiler passes use
+certain language features in their generated code, so the passes that
+remove those language features better come later in the ordering.
+
+One of the challenges of formalizing semantics in a proof assistant is
+that one needs to choose a representation of variables. There are many
+options, and I've tried most of them. But just like a game of
+whac-a-mole, the savings acheived in one place are lost in others.  My
+current favorite are good old de Bruijn indices. The following type
+\lstinline{Id} is for identifiers.
+
+\begin{lstlisting}
+Id = $ℕ$
+\end{lstlisting}
+
+\subsection{The source language}
+
+The source language is a language with integers, Booleans,
+\texttt{Let} binding, and conditional expressions. We choose a couple
+representative primitive operators: \texttt{Sub} for integer
+subtraction and \texttt{Eq} for equality on integers and
+Booleans.\footnote{Adding more primitive operators is straightforward
+but uninteresting.}  The \texttt{Read} operation requests an integer
+input from the user of the program.
+
+\begin{lstlisting}
+data Exp : Set where
+  Num : $ℤ$ $→$ Exp
+  Bool : $𝔹$ $→$ Exp
+  Read : Exp
+  Sub : Exp $→$ Exp $→$ Exp
+  Eq : Exp $→$ Exp $→$ Exp
+  Var : Id $→$ Exp
+  Let : Exp $→$ Exp $→$ Exp
+  If : Exp $→$ Exp $→$ Exp $→$ Exp
+\end{lstlisting}
+
+Towards specifying the semantics of this language, the inputs to the
+program are an infinite stream of integers represented as a natural
+number and a function from the naturals to the integers.  The natural
+number is incremented each time the program reads an input.
+
+\begin{lstlisting}
+Inputs = $ℕ$ $×$ ($ℕ$ $→$ $ℤ$)
+\end{lstlisting}
+
+The following monad is used to thread the inputs through the
+interpreter and to account for partiality via \lstinline{Maybe}
+(e.g. looking up an undefined variable).
+
+\begin{lstlisting}
+Reader A = Inputs $→$ Maybe (A $×$ Inputs)
+\end{lstlisting}
+
+\noindent The result of an expression is an integer or Boolean, for which we
+define the \lstinline{Value} type.
+
+\begin{lstlisting}
+data Value : Set where
+  Int : $ℤ$ $→$ Value
+  Bool : $𝔹$ $→$ Value
+\end{lstlisting}
+
+\noindent The variables (de Bruijn indices) are interpreted using an
+environment that is represented as a list of values.
+
+\begin{lstlisting}
+Env A = List A
+\end{lstlisting}
+
+\noindent The semantics of expressions is given by the
+\lstinline{interp-exp} function, which maps an expression and
+environment to a value, in our \lstinline{Reader} monad.
+
+\begin{lstlisting}
+interp-exp : Exp $→$ Env Value $→$ Reader Value
+\end{lstlisting}
+
+\noindent The semantics of a whole program is given by the
+\lstinline{interp-LIf} function.
+
+\begin{lstlisting}
+interp-LIf : Exp $→$ Inputs $→$ Maybe Value
+\end{lstlisting}
+
+\subsection{Monadic normal form}
+
+The first intermediate language restricts the arguments of the
+primitives \lstinline{Sub} and \lstinline{Eq} to be \emph{atomic}
+expressions, which we define to include variables and literals. This
+restriction gets us closer to x86, where instruction arguments may
+only be immediates (literals) or registers.
+
+
+\begin{lstlisting}
+data Atm : Set where
+  Num : $ℤ$ $→$ Atm 
+  Bool : $𝔹$ $→$ Atm 
+  Var : Id $→$ Atm
+
+data Mon : Set where
+  Atom : Atm $→$ Mon
+  Read : Mon
+  Sub : Atm $→$ Atm $→$ Mon
+  Eq : Atm $→$ Atm $→$ Mon
+  Let : Mon $→$ Mon $→$ Mon
+  If : Mon $→$ Mon $→$ Mon $→$ Mon
+\end{lstlisting}
+
+The interpreter for atoms does not make use of the \lstinline{Reader}
+monad because atoms do not have side effects.
+
+\begin{lstlisting}
+interp-atm : Atm $→$ Env Value $→$ Maybe Value
+\end{lstlisting}
+
+The interpreter for \lstinline{Mon} is similar to the
+one for \lstinline{Exp}, except that it dispatches
+to \lstinline{interp-atm} for atoms. The semantics
+of a whole program is given by \lstinline{interp-LMonIf}.
+
+\begin{lstlisting}
+interp-mon : Mon $→$ Env Value $→$ Reader Value
+interp-LMonIf : Mon $→$ Inputs $→$ Maybe Value
+\end{lstlisting}
+
+\subsection{Structured imperative IR}
+
+The third language replaces the \lstinline{Let} bindings with
+assignment expressions but retains the structured control-flow and
+expression-oriented nature of the language. This language brings us
+closer to x86 because variables are represented by registers and stack
+locations, all of which are mutable. The abstract syntax for
+assignment is \lstinline{(Assign $x$ $e_1$ $e_2$)} where $e_1$ is the
+right-hand side and $e_2$ is an expression to be executed after the
+assignment (reminiscent of the body of a \lstinline{Let}).  The
+\lstinline{Program} AST node consists of the number of variables and
+an expression.
+
+\begin{lstlisting}
+data Imp-Exp : Set where
+  Atom : Atm $→$ Imp-Exp
+  Read : Imp-Exp
+  Sub : Atm $→$ Atm $→$ Imp-Exp
+  Eq : Atm $→$ Atm $→$ Imp-Exp
+  Assign : Id $→$ Imp-Exp $→$ Imp-Exp $→$ Imp-Exp
+  If : Imp-Exp $→$ Imp-Exp $→$ Imp-Exp $→$ Imp-Exp
+  
+data Imp-Prog : Set where
+  Program : $ℕ$ $→$ Imp-Exp $→$ Imp-Prog
+\end{lstlisting}
+
+Regarding the semantics, the main change is that environments are now
+both an input and output. Also, in anticipation of the next language,
+we switch to representing the semantics as a relation, that is, a
+big-step semantics.
+
+\begin{lstlisting}
+StateImp = Inputs × Env Value
+data _$⊢$_$⇓$_$⊣$_ : StateImp $→$ Imp-Exp
+                     $→$ Value $→$ StateImp $→$ Set
+\end{lstlisting}
+
+\noindent Here is the rule for assignment:
+\[
+\inferrule{s , ρ ⊢ e_1 ⇓ v_1 ⊣ s′ , ρ′ \\
+           s′ , ρ′(x := v_1) ⊣ e_2 ⇓ s″ , ρ″}
+          {s , ρ ⊢ \mathtt{Assign}~ x~ e_1~ e_2 ⊣ s″ , ρ″}
+\]
+
+The semantics of whole programs is given by the following relation.
+
+\begin{lstlisting}
+interp-imp : Imp-Prog $→$ Inputs $→$ Value $→$ Set
+\end{lstlisting}
+
+\subsection{The C-like language}
+
+The fourth language is similar to the C programming language in that
+it supports \texttt{goto} and separates expressions from statements.
+However, to get us closer to x86, the condition of an \lstinline{if}
+statement is restricted to an equality test. This form of
+\lstinline{if} can be easily translated into a sequence of three x86
+instructions: \lstinline{cmpq}, \lstinline{je}, and \lstinline{jmp}.
+However, compiling from the previous IR to this one is non-trivial
+because the previous IR allowed arbitrarily nested expressions to
+appear in the condition of an \lstinline{if}, including other
+\lstinline{if}'s!
+
+\begin{lstlisting}
+data CExp : Set where
+  Atom : Atm $→$ CExp
+  Read : CExp
+  Sub : Atm $→$ Atm $→$ CExp
+  Eq : Atm $→$ Atm $→$ CExp
+
+data CStmt : Set where
+  Return : CExp $→$ CStmt
+  Assign : Id $→$ CExp $→$ CStmt $→$ CStmt
+  IfEq : Atm $→$ Atm $→$ Id $→$ Id $→$ CStmt
+  Goto : Id $→$ CStmt
+
+data CProg : Set where
+  Program : $ℕ$ $→$ Id $→$ List CStmt $→$ CProg
+\end{lstlisting}
+
+Note that the \lstinline{CStmt} type represents not just one statement
+but a block of statements that always end in either a
+\lstinline{Return} statement (that halts the program) or a jump to
+another block (\lstinline{Goto} or \lstinline{IfEq}).
+
+We choose a big-step semantics for C-like language because the
+semantics is no longer structurally recursive and furthermore,
+programs are no longer guaranteed to terminate.\footnote{The programs
+in the image of Explicate Control are guaranteed to terminate, but
+Agda doesn't know that.}  So encoding the semantics as a function in
+Agda would come with complications (such as using a gas parameter)
+that can be side-stepped by using a big-step semantics. Compared to
+the semantics for the imperative IR, this semantics refers to a list
+of blocks $B$ that can be the targets of gotos.
+
+\begin{lstlisting}
+data _,_$⊢ᶜ$_$⇓$_$⊣$_ : StateImp $→$ List CStmt $→$ CStmt
+                      $→$ Value $→$ StateImp $→$ Set
+\end{lstlisting}
+
+The rule for \lstinline{Goto} looks up the block for label $l$ and
+executes that block.
+\[
+\inferrule{s , B ⊢ᶜ B[l] ⇓ v ⊣ s′}
+          {s , B ⊢ᶜ \mathtt{Goto}~ l ⇓ v ⊣ s′}
+\]
+\noindent The rule for \lstinline{IfEq}, in the case when the
+arguments are equal, is as follows:
+\[
+\inferrule{\texttt{interp-CExp}(\mathtt{Eq}~a_1~a_2) = \mathsf{just}~\mathsf{true} \\
+           s , B ⊢ᶜ B[l_1] ⇓ v ⊣ s′}
+          {s , B ⊢ᶜ \mathtt{IfEq}~a_1~a_2~l_1~l_2 ⇓ v ⊣ s′}
+\]
+
+\noindent The semantics of whole programs is given by the following
+relation.
+
+\begin{lstlisting}
+interp-prog : CProg $→$ Inputs $→$ Value $→$ Set
+\end{lstlisting}
+
+\subsection{x86 with variables}
+
+The final intermediate language is a subset of x86 assembly language,
+except for the addition of variables. A complete compiler would
+include a few more passes to perform register allocation and deal with
+idiosyncrosies of x86, such as only allowing at most one instruction
+argument to access memory.
+
+\begin{lstlisting}
+data Arg : Set where
+  Num : $ℤ$ $→$ Arg
+  Bool : $𝔹$ $→$ Arg
+  Var : Id $→$ Arg
+  Reg : $ℕ$ $→$ Arg
+
+data Dest : Set where
+  Var : Id $→$ Dest
+  Reg : $ℕ$ $→$ Dest
+
+data Inst : Set where
+  MovQ : Arg $→$ Dest $→$ Inst
+  SubQ : Arg $→$ Dest $→$ Inst
+  CmpQ : Arg $→$ Arg $→$ Inst
+  Jmp : Id $→$ Inst
+  JmpEq : Id $→$ Inst
+  ReadInt : Inst
+
+Block : Set
+Block = List Inst
+
+data X86Var : Set where
+  Program : $ℕ$ $→$ Id $→$ List Block $→$ X86Var
+\end{lstlisting}
+
+The mutable state consists of the input, the registers, and the
+variables. However, we only use one register, \lstinline{rax}.
+
+%input + registers + variables
+\begin{lstlisting}
+StateX86 = Inputs × List Value × List Value
+\end{lstlisting}
+
+The meaning of each instruction is given by the following relation.
+The Boolean in this relation specifies whether the instruction
+falls-through to the next instruction or not (because it jumped).
+
+\begin{lstlisting}
+data _,_$⊢$_$⇓$_,_ : StateX86 $→$ List Block $→$ Inst
+                    $→$ StateX86 $→$ $𝔹$ $→$ Set
+\end{lstlisting}
+
+\noindent We take a few liberties to simplify the semantics with
+respect to x86 assembly language. For example, our \lstinline{CmpQ}
+instruction puts the result of the comparison into \lstinline{rax}
+instead of the special \lstinline{EFLAGS} register. Likewise,
+\lstinline{JmpEq} does not check the \lstinline{EFLAGS} register, but
+instead jumps if \lstinline{rax} contains \lstinline{true}.
+
+\noindent The meaning of a sequence of instructions is given the
+following big-step relation.
+
+\begin{lstlisting}
+data _,_$⊩$_$⇓$_,_ : StateX86 $→$ List Block $→$ List Inst
+                     $→$ StateX86 $→$ $𝔹$ $→$ Set 
+\end{lstlisting}
+
+This big-step treatment of the semantics of instruction sequences is
+unusual, so here are the three rules.
+
+\begin{gather*}
+\inferrule{}{s , B ⊩ [] ⇓ s , \mathsf{true}} \\[1ex]
+\inferrule{s , B ⊢ i ⇓ s′ , \mathsf{true} \\
+           s′ , B ⊩ is ⇓ s″ , b}
+          {s , B ⊩ i ∷ is ⇓ s′ , b}\\[1ex]
+\inferrule{s , B ⊢ i ⇓ s′ , \mathsf{false}}
+          {s , B ⊩ i ∷ is ⇓ s′ , b}
+\end{gather*}
+
+The meaning of a whole program is given by the following relation.
+\begin{lstlisting}
+interp-x86-var : X86Var → Inputs → Value → Set
+\end{lstlisting}
+    
+We now proceed to discuss each compiler pass and its proof of
+correctness.
+
+\section{Pass: Remove Complex Operands}
+
+\section{Pass: Lift Locals}
+
+\section{Pass: Explicate Control}
+
+\section{Pass: Select Instructions}
+
+\section{The Compiler is Correct}
 
 
 

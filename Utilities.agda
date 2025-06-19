@@ -2,6 +2,7 @@ module Utilities where
 
 open import Agda.Builtin.Unit
 import Data.Bool
+open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Nat using (ℕ; zero; suc; _≤ᵇ_; _≤_; _<_; _+_; s≤s; _∸_)
 open import Data.Nat.Properties
 open import Data.Product hiding (map)
@@ -48,7 +49,40 @@ shifts-var x c n
 ... | true = n + x
 ... | false = x
 
+down-var : Id → ℕ → Id
+down-var zero c = 0
+down-var (suc x) c
+    with c Data.Nat.≤ᵇ (suc x)
+... | true = x
+... | false = suc x
+
 --- Properties
+
+eq-true-top : ∀{P} → P ≡ true → Data.Bool.T P
+eq-true-top {P} eq rewrite eq = tt
+
+eq-false-not-top : ∀{P} → P ≡ false → ¬ Data.Bool.T P
+eq-false-not-top {P} eq rewrite eq = λ {()}
+
+down-shift-var : ∀ (x : Id) (c : ℕ)
+    → down-var (shift-var x c) (suc c) ≡ x
+down-shift-var zero zero = refl
+down-shift-var zero (suc c) = refl
+down-shift-var (suc x) c
+    with c Data.Nat.≤ᵇ (suc x) in lt
+... | true
+    with c Data.Nat.<ᵇ (suc (suc x)) in less
+... | true = refl
+... | false =
+    let c≤sx = ≤ᵇ⇒≤ c (suc x) (eq-true-top lt) in
+    ⊥-elim ((eq-false-not-top less) (<⇒<ᵇ (s≤s c≤sx) ))
+down-shift-var (suc x) c
+    | false
+    with c Data.Nat.<ᵇ (suc x) in less
+... | true =
+    let c<sx = <ᵇ⇒< c (suc x) (eq-true-top less) in
+    ⊥-elim ((eq-false-not-top lt) (≤⇒≤ᵇ (<⇒≤ c<sx)))
+... | false = refl
 
 update-correct : ∀ {A} (xs ys : List A) (v v' : A)
   → update (xs ++ v ∷ ys) (length xs) v' ≡ xs ++ v' ∷ ys
@@ -126,12 +160,6 @@ update-length : ∀ {A : Set} (ρ : List A) (x : Id) (v : A)
 update-length [] x v = refl
 update-length (z ∷ ρ) zero v = refl
 update-length (z ∷ ρ) (suc x) v rewrite update-length ρ x v = refl
-
-eq-true-top : ∀{P} → P ≡ true → Data.Bool.T P
-eq-true-top {P} eq rewrite eq = tt
-
-eq-false-not-top : ∀{P} → P ≡ false → ¬ Data.Bool.T P
-eq-false-not-top {P} eq rewrite eq = λ {()}
 
 nth-++-shift-var : ∀{A : Set} (ρ₁ ρ₂ : List A) (v : A) (x : Id)
   → nth (ρ₁ ++ v ∷ ρ₂) (shift-var x (length ρ₁))

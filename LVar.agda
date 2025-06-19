@@ -117,8 +117,8 @@ data _⊢_⇓_⊣_ : StateIL → IL-Exp → ℤ → StateIL → Set where
      → (s′ , update ρ′ x n₁) ⊢ e₂  ⇓ n₂ ⊣ sρ″ 
      → sρ ⊢ Assign x e₁ e₂ ⇓ n₂ ⊣ sρ″ 
 
-interp-ilprog : IL-Prog → Inputs → ℤ → Set
-interp-ilprog (Program n e) s v =
+interp-imp : IL-Prog → Inputs → ℤ → Set
+interp-imp (Program n e) s v =
     Σ[ sρ′ ∈ Inputs × Env ℤ ] (s , (replicate n 0ℤ)) ⊢ e ⇓ v ⊣ sρ′ 
 
 ----------------- Lift Locals ----------------------------

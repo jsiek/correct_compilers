@@ -48,9 +48,9 @@ nth-blocks : ∀ {B₁ B₂ : Blocks} {l : ℕ} {t : CStmt}
   → nth B₂ l ≡ just t
 nth-blocks {B₁}{l = l}{t} (B , refl) n1 = nth-++-just B₁ B l t n1
 
-explicate-assign-blocks : ∀ {x : Id}{m : IL-Exp} {t t' : CStmt} {B₁ B₂ : Blocks} → explicate-assign x m t B₁ ≡ (t' , B₂) → B₁ ↝ B₂
-explicate-pred-blocks : ∀ {m : IL-Exp}{t₁ t₂ t : CStmt}{B₁ B₂ : Blocks} → explicate-pred m t₁ t₂ B₁ ≡ (t , B₂) → B₁ ↝ B₂
-explicate-tail-blocks : ∀ {m : IL-Exp} {B₁ B₂ : Blocks}{t : CStmt} → explicate-tail m B₁ ≡ (t , B₂) → B₁ ↝ B₂
+explicate-assign-blocks : ∀ {x : Id}{m : Imp-Exp} {t t' : CStmt} {B₁ B₂ : Blocks} → explicate-assign x m t B₁ ≡ (t' , B₂) → B₁ ↝ B₂
+explicate-pred-blocks : ∀ {m : Imp-Exp}{t₁ t₂ t : CStmt}{B₁ B₂ : Blocks} → explicate-pred m t₁ t₂ B₁ ≡ (t , B₂) → B₁ ↝ B₂
+explicate-tail-blocks : ∀ {m : Imp-Exp} {B₁ B₂ : Blocks}{t : CStmt} → explicate-tail m B₁ ≡ (t , B₂) → B₁ ↝ B₂
 
 explicate-pred-blocks {Atom a} {c-thn} {c-els} {c} {B₁} {B₂} refl =
     let (l-thn , B′) = create-block c-thn B₁ in
@@ -141,14 +141,14 @@ sub-not-bool : ∀ {n₁ n₂ : Value}{b : 𝔹}
 sub-not-bool {Int x}{Int x₁} ()
 sub-not-bool {Int x}{Bool x₁} ()
 
-explicate-assign-correct : ∀{x : Id}{e : IL-Exp}{t : CStmt}{ρ ρ′ ρ″ : Env Value}{s s′ s″ : Inputs}{B B′ : List CStmt}{c : CStmt}
+explicate-assign-correct : ∀{x : Id}{e : Imp-Exp}{t : CStmt}{ρ ρ′ ρ″ : Env Value}{s s′ s″ : Inputs}{B B′ : List CStmt}{c : CStmt}
     {n v : Value}
   → (s , ρ) ⊢ e ⇓ n ⊣ (s′ , ρ′)
   → (s′ , update ρ′ x n) , B ⊢ᶜ t ⇓ v ⊣ (s″ , ρ″)
   → explicate-assign x e t B ≡ (c , B′)
   → (s , ρ) , B′ ⊢ᶜ c ⇓ v ⊣ (s″ , ρ″)
 
-explicate-pred-correct : ∀ {e₁ : IL-Exp} {c₁ c₂ c₃ : CStmt} {b : 𝔹} {v : Value} {s s′ s″ : Inputs} {ρ ρ′ ρ″ : Env Value} {B′ B″ B‴ : Blocks}
+explicate-pred-correct : ∀ {e₁ : Imp-Exp} {c₁ c₂ c₃ : CStmt} {b : 𝔹} {v : Value} {s s′ s″ : Inputs} {ρ ρ′ ρ″ : Env Value} {B′ B″ B‴ : Blocks}
   → (s , ρ) ⊢ e₁ ⇓ Bool b ⊣ (s′ , ρ′)
   → ((s′ , ρ′) , B′ ⊢ᶜ (if b then c₂ else c₃) ⇓ v ⊣ (s″ , ρ″))
   -- → (b ≡ true  →  (s′ , ρ′) , B′ ⊢ᶜ c₂ ⇓ v ⊣ (s″ , ρ″))
@@ -362,7 +362,7 @@ explicate-assign-correct {x}{ (If e₁ e₂ e₃)}{ t}{ ρ}{ ρ′}{ ρ″}{ s}{
     let IH3 = explicate-assign-correct e₃⇓v₃ (⇓goto nth2 t⇓v′) ea3 in
     explicate-pred-correct e₁⇓v₁ IH3 ↝-refl ep1
 
-explicate-tail-correct : ∀ {e : IL-Exp}{ρ ρ' : Env Value}{s s' : Inputs}{B B′ : List CStmt}{c : CStmt}{v : Value}
+explicate-tail-correct : ∀ {e : Imp-Exp}{ρ ρ' : Env Value}{s s' : Inputs}{B B′ : List CStmt}{c : CStmt}{v : Value}
   → (s , ρ) ⊢ e ⇓ v ⊣ (s' , ρ')
   → explicate-tail e B ≡ (c , B′)
   → (s , ρ) , B′ ⊢ᶜ c ⇓ v ⊣ (s' , ρ')
@@ -398,8 +398,8 @@ explicate-tail-correct {(If e₁ e₂ e₃)}{ ρ}{ ρ″}{ s}{ s″}{ B}{ B′}{
     let c₃⇓ = explicate-tail-correct {e₃} e₃⇓v refl in
     explicate-pred-correct {e₁} e₁⇓false c₃⇓ ↝-refl refl
 
-explicate-correct : ∀ (p : IL-Prog) (s : Inputs) (v : Value)
-  → interp-ilprog p s v
+explicate-correct : ∀ (p : Imp-Prog) (s : Inputs) (v : Value)
+  → interp-imp p s v
   → interp-prog (explicate p) s v
 explicate-correct (Program n e) s v ((s' , ρ') , e⇓v)
     with explicate-tail e [] in et

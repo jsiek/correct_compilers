@@ -52,7 +52,7 @@ explicate-tail-correct (Assign x e₁ e₂) ρ ρ' s s' v (⇓assign {s′ = s�
   explicate-assign-correct x e₁ (explicate-tail e₂) ρ ρ′ ρ' s s′ s' n₁ v e₁⇓n₁ IH2
 
 explicate-correct : ∀ (p : IL-Prog) (s : Inputs) (v : ℤ)
-  → interp-ilprog p s v
+  → interp-imp p s v
   → interp-prog (explicate p) s v
 explicate-correct (Program n e) s v ((s' , ρ') , e⇓v) =
     ((s' , ρ')) , explicate-tail-correct e (replicate n 0ℤ) ρ' s s' v e⇓v
