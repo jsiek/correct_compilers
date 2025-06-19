@@ -79,7 +79,7 @@ interp-shifts-atm (Var x) ρ₁ ρ₂ ρ₃ = nth-++-shifts-var ρ₁ ρ₂ ρ�
   → (s , ρ₁ ++ ρ₃) ⊢ e ⇓ v ⊣ (s′ , ρ′₁ ++ ρ′₃)
   → length ρ′₁ ≡ length ρ₁
   → (s , ρ₁ ++ ρ₂ ++ ρ₃) ⊢
-      shifts-ilexp e (length ρ₁) (length ρ₂) ⇓ v ⊣ (s′ , ρ′₁ ++ ρ₂ ++ ρ′₃)
+      shifts-imp-exp e (length ρ₁) (length ρ₂) ⇓ v ⊣ (s′ , ρ′₁ ++ ρ₂ ++ ρ′₃)
 ⇓shifts {Atom a} {v} {s} {s′}{ρ₁}{ρ′₁}{ρ₂}{ρ₃}{ρ′₃} e⇓v lρ1
     with ⇓atom-elim e⇓v
 ... | ia , refl , eq2 
@@ -153,7 +153,7 @@ interp-shifts-atm (Var x) ρ₁ ρ₂ ρ₃ = nth-++-shifts-var ρ₁ ρ₂ ρ�
         = refl
        
     Goal : (_ , update (ρ″₁ ++ ρ₂ ++ ρ″₃) (length ρ₂ + (length ρ″₁ + i)) n₁)
-      ⊢ shifts-ilexp e₂ (length ρ″₁) (length ρ₂)
+      ⊢ shifts-imp-exp e₂ (length ρ″₁) (length ρ₂)
       ⇓ v₂ ⊣ (s′ , ρ′₁ ++ ρ₂ ++ ρ′₃)
     Goal
         rewrite sym (+-assoc (length ρ₂) (length ρ″₁) i)

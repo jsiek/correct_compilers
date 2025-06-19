@@ -255,17 +255,17 @@ interp-imp (Program n e) s v = Σ[ s′ ∈ StateImp ] (s , ρ) ⊢ e ⇓ v ⊣ 
 
 ----------------- Lift Locals ----------------------------
 
-shifts-ilexp : Imp-Exp → ℕ → ℕ → Imp-Exp
-shifts-ilexp (Atom atm) c n = Atom (shifts-atm atm c n)
-shifts-ilexp Read c n = Read
-shifts-ilexp (Sub a₁ a₂) c n =
+shifts-imp-exp : Imp-Exp → ℕ → ℕ → Imp-Exp
+shifts-imp-exp (Atom atm) c n = Atom (shifts-atm atm c n)
+shifts-imp-exp Read c n = Read
+shifts-imp-exp (Sub a₁ a₂) c n =
     Sub (shifts-atm a₁ c n) (shifts-atm a₂ c n)
-shifts-ilexp (Eq a₁ a₂) c n =
+shifts-imp-exp (Eq a₁ a₂) c n =
     Eq (shifts-atm a₁ c n) (shifts-atm a₂ c n)
-shifts-ilexp (Assign x e₁ e₂) c n =
-    Assign (shifts-var x c n) (shifts-ilexp e₁ c n) (shifts-ilexp e₂ c n)
-shifts-ilexp (If e₁ e₂ e₃) c n =
-    If (shifts-ilexp e₁ c n) (shifts-ilexp e₂ c n) (shifts-ilexp e₃ c n)
+shifts-imp-exp (Assign x e₁ e₂) c n =
+    Assign (shifts-var x c n) (shifts-imp-exp e₁ c n) (shifts-imp-exp e₂ c n)
+shifts-imp-exp (If e₁ e₂ e₃) c n =
+    If (shifts-imp-exp e₁ c n) (shifts-imp-exp e₂ c n) (shifts-imp-exp e₃ c n)
 
 -- Lift Locals hoists all the Let's to the top, leaving in their place assignments.
 --   let x = e₁ in e₂
@@ -288,7 +288,7 @@ lift-locals-mon (Let m₁ m₂)
 ... | i , e₁
     with lift-locals-mon m₂
 ... | j , e₂
-    = (suc (i + j)) , Assign (i + j) (shifts-ilexp e₁ 0 (suc j)) (shifts-ilexp e₂ j i)
+    = (suc (i + j)) , Assign (i + j) (shifts-imp-exp e₁ 0 (suc j)) (shifts-imp-exp e₂ j i)
 lift-locals-mon (If m₁ m₂ m₃) 
     with lift-locals-mon m₁ 
 ... | i , e₁
@@ -297,9 +297,9 @@ lift-locals-mon (If m₁ m₂ m₃)
     with lift-locals-mon m₃ 
 ... | k , e₃
     =
-    let e′₁ = shifts-ilexp e₁ 0 (j + k) in
-    let e′₂ = shifts-ilexp (shifts-ilexp e₂ 0 k) (k + j) i in
-    let e′₃ = shifts-ilexp e₃ k (i + j) in
+    let e′₁ = shifts-imp-exp e₁ 0 (j + k) in
+    let e′₂ = shifts-imp-exp (shifts-imp-exp e₂ 0 k) (k + j) i in
+    let e′₃ = shifts-imp-exp e₃ k (i + j) in
     (i + j + k) , (If e′₁ e′₂ e′₃)
     
 lift-locals : Mon → Imp-Prog

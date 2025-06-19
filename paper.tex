@@ -135,9 +135,10 @@
 \lstset{%
 language=Python,
 basicstyle=\ttfamily\small,
-morekeywords={match,case,bool,int,let,begin,if,else,closure},
-deletekeywords={},
-escapechar=|,
+keywordstyle=\ttfamily\small,
+%morekeywords={match,case,bool,int,let,begin,if,else,closure},
+%deletekeywords={locals},
+%escapechar=|,
 mathescape=true,
 columns=flexible,
 %moredelim=[is][\color{red}]{~}{~},
@@ -439,12 +440,15 @@ nanopasses.  So then the question becomes, why do we choose to order
 the nanopasses in this way? The main thing to consider is that some
 passes make later passes easier because they remove a language feature
 that would have been complicated to handle. For example, the Lift
-Locals pass removed \texttt{let}, and I found \texttt{let} difficult
+Locals pass removes \texttt{let}, and I found \texttt{let} difficult
 to deal with in the proof of correctness for Explicate Control
 (\texttt{let} is relatively easy to handle in the code for Explicate
 Control). The other thing to consider is that some compiler passes use
 certain language features in their generated code, so the passes that
-remove those language features better come later in the ordering.
+remove those language features better come later in the ordering.  For
+example, the Closure Conversion pass (not discussed here) generates
+code with \texttt{let}, so Closure Conversion comes before Lift
+Locals.
 
 One of the challenges of formalizing semantics in a proof assistant is
 that one needs to choose a representation of variables. There are many
@@ -457,15 +461,16 @@ current favorite are good old de Bruijn indices. The following type
 Id = $ℕ$
 \end{lstlisting}
 
-\subsection{The source language}
+\subsection{The Source Language}
 
-The source language is a language with integers, Booleans,
-\texttt{Let} binding, and conditional expressions. We choose a couple
-representative primitive operators: \texttt{Sub} for integer
-subtraction and \texttt{Eq} for equality on integers and
-Booleans.\footnote{Adding more primitive operators is straightforward
-but uninteresting.}  The \texttt{Read} operation requests an integer
-input from the user of the program.
+The source language includes integers, Booleans, \texttt{Let} binding,
+and conditional expressions. We choose a couple representative
+primitive operators: \texttt{Sub} for integer subtraction and
+\texttt{Eq} for equality on integers and Booleans.\footnote{Adding
+more primitive operators is straightforward but uninteresting.}  The
+\texttt{Read} operation requests an integer input from the user of the
+program.\footnote{\texttt{Read} is necessary to prevent students from
+interpreting the programs instead of compiling them.}
 
 \begin{lstlisting}
 data Exp : Set where
@@ -527,14 +532,13 @@ interp-exp : Exp $→$ Env Value $→$ Reader Value
 interp-LIf : Exp $→$ Inputs $→$ Maybe Value
 \end{lstlisting}
 
-\subsection{Monadic normal form}
+\subsection{Monadic Normal Form}
 
 The first intermediate language restricts the arguments of the
 primitives \lstinline{Sub} and \lstinline{Eq} to be \emph{atomic}
 expressions, which we define to include variables and literals. This
 restriction gets us closer to x86, where instruction arguments may
-only be immediates (literals) or registers.
-
+only be immediates (literals), registers, or memory accesses.
 
 \begin{lstlisting}
 data Atm : Set where
@@ -568,7 +572,7 @@ interp-mon : Mon $→$ Env Value $→$ Reader Value
 interp-LMonIf : Mon $→$ Inputs $→$ Maybe Value
 \end{lstlisting}
 
-\subsection{Structured imperative IR}
+\subsection{Structured Imperative IR}
 
 The third language replaces the \lstinline{Let} bindings with
 assignment expressions but retains the structured control-flow and
@@ -777,7 +781,217 @@ correctness.
 
 \section{Pass: Remove Complex Operands}
 
+We implement the Remove Complex Operands pass with the following
+\lstinline{rco} function in Agda. This pass is responsible for making
+sure that the arguments of primitive operations, such as
+\lstinline{Sub} and \lstinline{Eq}, are atomic expression (variables
+or literals).
+
+\begin{lstlisting}
+rco : Exp $→$ Mon
+\end{lstlisting}
+
+Most of the cases of \lstinline{rco} are trivial, but let us focus on
+the case for subtraction. We shall start with a strawman
+translation. We recursively compile the subexpressions $e_1$ and
+$e_2$. The results might be complex (not atomic), so we
+\lstinline{let} binding them both and replace them in the subtraction
+with variables (de Bruijn indices 0 and 1). Note that we must shift
+the variables in $e_2$ up by one because we inserted a new
+\lstinline{let} above $e_2$. (In general, \lstinline{shift-mon m c}
+increases by one each variable in $m$ that is greater or equal to the
+cutoff $c$.)
+
+\begin{lstlisting}
+rco (Sub e$₁$ e$₂$) =
+  Let (rco e$₁$)
+   (Let (shift-mon (rco e$₂$) 0)
+    (Sub (Var 1) (Var 0)))
+\end{lstlisting}
+
+However, the above translation inserts more \lstinline{let} bindings
+than are strictly necessary. If $e_1$ and/or $e_2$ compile to an atom,
+then there is no need to bind them to a \lstinline{let}.  The
+following is an alternative translation for \lstinline{Sub} that
+includes four different cases, depending on whether \lstinline{rco e$₁$}
+and \lstinline{rco e$₂$} are atomic.
+
+\begin{lstlisting}
+rco (Sub e$₁$ e$₂$)
+    with rco e$₁$ | rco e$₂$
+... | m$₁$ | m$₂$
+    with atomic? m$₁$ | atomic? m$₂$
+... | yes (atomic a$₁$) | yes (atomic a$₂$) =
+      Sub a$₁$ a$₂$
+... | no cmplx$₁$ | yes (atomic a$₂$) =
+      Let (rco e$₁$) (Sub (Var zero) (shift-atm a$₂$ 0))
+... | yes (atomic a$₁$) | no cmplx$₂$ =
+      Let (rco e$₂$) (Sub (shift-atm a$₁$ 0) (Var 0))
+... | no cmplx$₁$ | no cmplx$₂$ = 
+      Let m$₁$
+        (Let (shift-mon m$₂$ 0)
+          (Sub (Var 1) (Var 0)))
+\end{lstlisting}
+
+(It would be nice to collapse the four cases into one, but I have not
+yet figured out how to do that while accounting for the necessary
+shifting of de Bruijn indices.)
+
+The correctness theorem for Remove Complex Operands says that for any
+program $e$, interpreting $\mathtt{rco}\,e$ with input $s$ yields the
+same output as directly interpreting $e$ with the same input.
+
+\begin{lstlisting}
+rco-correct : $∀$ (e : Exp) (s : Inputs)
+  $→$ interp-LMonIf (rco e) s $≡$ interp-LIf e s 
+\end{lstlisting}
+
+The main lemma is that \lstinline{rco} followed by
+\lstinline{interp-mon} is equivalent to \lstinline{interp-exp}.
+
+\begin{lstlisting}
+rco-correct-exp : ∀ (e : Exp) (ρ : Env Value)
+  → interp-mon (rco e) ρ ≡ interp-exp e ρ
+\end{lstlisting}
+
+The proof is by structural induction on $e$, but it requires the
+following lemmas regarding the shifting of de Bruijn indices.
+The idea is that the result of looking up variable $x$ in
+environment ($ρ₁$ ++ $ρ₂$) produces the same result as
+shifting the variable by one with the cutoff set to the
+the length of $ρ₁$ and looking it up in the environment
+($ρ₁$ ++ v $∷$ $ρ₂$), for any value $v$.
+
+\begin{lstlisting}
+nth-++-shift-var : ($ρ₁$ $ρ₂$ : List A)(v : A)(x : Id)
+  $→$ nth ($ρ₁$ ++ v $∷$ $ρ₂$) (shift-var x (length $ρ₁$))
+    $≡$ nth ($ρ₁$ ++ $ρ₂$) x
+
+interp-shift-atm : (a : Atm)(v : Value)($ρ₁$ $ρ₂$ : Env Value)
+  $→$ interp-atm (shift-atm a (length $ρ₁$)) ($ρ₁$ ++ v $∷$ $ρ₂$) 
+    $≡$ interp-atm a ($ρ₁$ ++ $ρ₂$) 
+
+interp-shift-mon : (m : Mon)(v : Value)($ρ₁$ $ρ₂$ : Env Value)
+  $→$ interp-mon (shift-mon m (length $ρ₁$)) ($ρ₁$ ++ (v $∷$ $ρ₂$))
+    $≡$ interp-mon m ($ρ₁$ ++ $ρ₂$)
+\end{lstlisting}
+
+
 \section{Pass: Lift Locals}
+
+The Lift Locals pass is responsible for replacing all of the
+\lstinline{let} expressions with assignment statements.  After this
+pass, variables are still represented by de Bruijn indices but they
+are all bound by the \lstinline{Program} AST node.
+
+The \lstinline{lift-locals} function delegates to the recursive
+function \lstinline{lift-locals-mon}, where all the work is done.
+That function returns a number $n$ that counts the number of
+\lstinline{let} bindings in the expression, and the translated
+expression.
+
+\begin{lstlisting}
+lift-locals : Mon → Imp-Prog
+lift-locals m
+    with lift-locals-mon m
+... | n , e = Program n e    
+\end{lstlisting}
+
+\noindent The case of \lstinline{lift-locals-mon} for \lstinline{Let}
+is the most interesting. One can imagine that the result of
+\lstinline{lift-locals-mon m$₁$} is a sequence of $i$ imaginary
+\lstinline{let}'s surrounding \lstinline{e$₁$}. Similarly for 
+\lstinline{lift-locals-mon m$₁$}.
+The translation result for this \lstinline{Let} should be
+a sequence of $i + j + 1$ imaginary
+\lstinline{let}'s, followed by an assignment
+of \lstinline{e$₁$} to the appropriate variable, and then the
+code for \lstinline{e$₂$}. However, we need to shift
+the variables in \lstinline{e$₁$} up by $j + 1$ because
+we are moving all of the $j$ \lstinline{let}'s for
+\lstinline{e$₂$} above \lstinline{e$₁$}, as well as the
+current \lstinline{let}. Thus, we need another function
+for shifting de Bruijn indices by an arbitrary amount.
+
+\begin{lstlisting}
+shifts-imp-exp : Imp-Exp $→$ $ℕ$ $→$ $ℕ$ $→$ Imp-Exp
+\end{lstlisting}
+
+The variables in \lstinline{e$₂$} also need to be shifted.  They are
+shifted up by $i$ because we are moving all of the $i$
+\lstinline{let}'s for \lstinline{e$₁$} above
+\lstinline{e$₂$}. Regarding the variable that serves as the left-hand
+side of the assignment, its de Bruijn index is $i + j$ because the
+original index for this \lstinline{Let} was $0$ but we have moved $i +
+j$ other \lstinline{let}s above this variable occurence.
+
+\begin{lstlisting}
+lift-locals-mon (Let m$₁$ m$₂$)
+    with lift-locals-mon m$₁$
+... | i , e$₁$
+    with lift-locals-mon m$₂$
+... | j , e$₂$ =
+    let e$′₁$ = shifts-imp-exp e$₁$ 0 (suc j) in
+    let e$′₂$ = shifts-imp-exp e$₂$ j i in
+    suc (i + j) , Assign (i + j) e$′₁$ e$′₂$
+\end{lstlisting}
+
+The case of \lstinline{lift-locals-mon} for \lstinline{If} is also
+complicated because there are three subexpressions that must all be
+shifted appropriately.
+
+The correctness theorem for Lift Locals says that if a program output
+is $v$ given input $s$, then Lift Locals produces a program that
+outputs the same value given the same input.
+
+\begin{lstlisting}
+lift-locals-correct : $∀$(m : Mon)(s : Inputs)(v : Value)
+  $→$ interp-LMonIf m s $≡$ just v
+  $→$ interp-imp (lift-locals m) s v
+\end{lstlisting}
+
+This theorem is a corollary of the following main lemma, which is
+proved by structural induction on the expression \lstinline{m}.
+Considerable care is needed in the statement of this lemma so that the
+induction hypotheses can be used. Recall that when interpreting an
+expression, the environment $ρ$ provides the meaning for the
+\emph{free variables} in the expression.  As the interpreter descends
+under \lstinline{let} bindings, it pushes values on the front of the
+environment. However, after Lift Locals, all of the variables are
+bound at the top, so the initial environment won't be empty, but
+instead will have entries for all of the variables (we arbitrarily
+initialize them to $0$). So in general, we can separate the
+environment into two halves, $ρ₁$ and $ρ₂$, where $ρ₂$ is for the free
+variables in \lstinline{m} whereas \lstinline{$ρ₁$ ++ $ρ₂$} is for the
+free variables in the result expressoin \lstinline{e} of
+\lstinline{lift-locals-mon m}. The length of $ρ₁$ corresponds to the
+number returned by \lstinline{lift-locals-mon m}. Also, note that
+because \lstinline{Mon} is a pure language, \lstinline{e} contains a
+single assignment to each variable, so $ρ₂$ is unchanged by the
+execution of \lstinline{e}. ($ρ₁$ is changed as each of its variables
+are assigned to for the first time.)
+
+\begin{lstlisting}
+lift-locals-mon-correct : $∀$(m : Mon)(e : Imp-Exp)
+    (s $s′$ : Inputs)(v : Value) ($ρ₁$ $ρ₂$ : Env Value)
+  $→$ interp-mon m $ρ₂$ s $≡$ just (v , $s′$)
+  $→$ lift-locals-mon m $≡$ (length $ρ₁$ , e)
+  $→$ $∃$[ $ρ′₁$ ] (s , $ρ₁$ ++ $ρ₂$) $⊢$ e $⇓$ v $⊣$ ($s′$ , $ρ′₁$ ++ $ρ₂$)
+      × length $ρ₁$ $≡$ length $ρ′₁$
+\end{lstlisting}
+
+The main lemma relies on more lemmas about shifting de Bruijn indices
+that generalize our previous ones to arbitrary amounts of shifting.
+
+\begin{lstlisting}
+$⇓$shifts : $∀${e}{v}{s $s′$}{$ρ₁$ $ρ′₁$ $ρ₂$ $ρ₃$ $ρ′₃$} 
+  $→$ (s , $ρ₁$++$ρ₃$) $⊢$ e $⇓$ v $⊣$ ($s′$ , $ρ′₁$++$ρ′₃$)
+  $→$ length $ρ′₁$ $≡$ length $ρ₁$
+  $→$ (s , $ρ₁$++$ρ₂$++$ρ₃$) $⊢$
+       shifts-imp-exp e (length $ρ₁$) (length $ρ₂$)
+       $⇓$ v $⊣$ ($s′$ , $ρ′₁$++$ρ₂$++$ρ′₃$)
+\end{lstlisting}
+
 
 \section{Pass: Explicate Control}
 

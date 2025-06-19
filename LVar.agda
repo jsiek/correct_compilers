@@ -127,13 +127,13 @@ shifts-atm : Atm → ℕ → ℕ → Atm
 shifts-atm (Num x) c n = Num x
 shifts-atm (Var x) c n = Var (shifts-var x c n)
 
-shifts-ilexp : IL-Exp → ℕ → ℕ → IL-Exp
-shifts-ilexp (Atom atm) c n = Atom (shifts-atm atm c n)
-shifts-ilexp Read c n = Read
-shifts-ilexp (Sub a₁ a₂) c n =
+shifts-imp-exp : IL-Exp → ℕ → ℕ → IL-Exp
+shifts-imp-exp (Atom atm) c n = Atom (shifts-atm atm c n)
+shifts-imp-exp Read c n = Read
+shifts-imp-exp (Sub a₁ a₂) c n =
     Sub (shifts-atm a₁ c n) (shifts-atm a₂ c n)
-shifts-ilexp (Assign x e₁ e₂) c n =
-    Assign (shifts-var x c n) (shifts-ilexp e₁ c n) (shifts-ilexp e₂ c n)
+shifts-imp-exp (Assign x e₁ e₂) c n =
+    Assign (shifts-var x c n) (shifts-imp-exp e₁ c n) (shifts-imp-exp e₂ c n)
 
 -- Lift Locals hoists all the Let's to the top, leaving in their place assignments.
 --   let x = e₁ in e₂
@@ -155,7 +155,7 @@ lift-locals-mon (Let m₁ m₂)
 ... | i , e₁
     with lift-locals-mon m₂
 ... | j , e₂
-    = (suc (i + j)) , Assign (i + j) (shifts-ilexp e₁ 0 (suc j)) (shifts-ilexp e₂ j i)
+    = (suc (i + j)) , Assign (i + j) (shifts-imp-exp e₁ 0 (suc j)) (shifts-imp-exp e₂ j i)
 
 lift-locals : Mon → IL-Prog
 lift-locals m
