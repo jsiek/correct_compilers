@@ -1236,7 +1236,7 @@ for assignment and conditional expressions rely on the correctness
 lemmas for \lstinline{explicate-assign} and
 \lstinline{explicate-pred}.
 
-The case for conditional expressions also requires a lemma about the
+The case for conditional expressions also two lemmas about the
 monotonicity of the control flow graph.  The induction hypothesis for
 \lstinline{e$₂$} says that the generated \lstinline{c$₂$} evaluates
 using the CFG that was produced by the compilation of
@@ -1248,13 +1248,22 @@ expression that one CFG is a prefix of another CFG:
 \begin{lstlisting}
 G$₁$ $↝$ G$₂$ = $∃$[ G ] G$₁$ ++ G $≡$ G$₂$
 \end{lstlisting}
-\noindent We prove the following lemma which states that the ouput CFG of
-\lstinline{explicate-tail} is an extension of its input CFG.
+\noindent We prove that the ouput CFG of \lstinline{explicate-tail} is
+an extension of its input CFG.
 \begin{lstlisting}
 explicate-tail-CFG : $∀${e}{G$₁$ G$₂$}{c}
   $→$ explicate-tail e G$₁$ $≡$ (c , G$₂$)
   $→$ G$₁$ $↝$ G$₂$
 \end{lstlisting}
+\noindent And we prove that the big-step semantics is monotonic with
+respect to the $↝$ relation on control flow graphs.
+\begin{lstlisting}
+eval-CFG : $∀${c}{$ρ$ $ρ′$}{B$₁$ B$₂$}{s s$′$}{v}
+  → B$₁$ $↝$ B$₂$
+  → (s , $ρ$) , B$₁$ $⊢ᶜ$ c $⇓$ v $⊣$ (s$′$ , $ρ′$)
+  → (s , $ρ$) , B$₂$ $⊢ᶜ$ c $⇓$ v $⊣$ (s$′$ , $ρ′$)
+\end{lstlisting}
+
 
 \paragraph{Explicate Assign is Correct}
 
@@ -1271,36 +1280,52 @@ explicate-assign-correct :
   $→$ (s , $ρ$) , G$′$ $⊢ᶜ$ c$₁$ $⇓$ v $⊣$ (s$″$ , $ρ″$)
 \end{lstlisting}
 
-\noindent The case for conditional expressions needs a couple more
-lemmas regarding control flow graphs. Similar to
-\lstinline{explicate-tail}, we need a lemma which states that the
-ouput CFG of \lstinline{explicate-assign} is an extension of its input
-CFG.
+\noindent The case for conditional expressions needs another lemma
+regarding control flow graphs. Similar to \lstinline{explicate-tail},
+we need a lemma which states that the ouput CFG of
+\lstinline{explicate-assign} is an extension of its input CFG.
 
 \begin{lstlisting}
-explicate-assign-CFG : ∀{x}{m}{t t'}{G₁ G₂}
-  → explicate-assign x m t G₁ ≡ (t' , G₂)
-  → G₁ ↝ G₂
+explicate-assign-CFG : $∀${x}{m}{c c'}{G$₁$ G$₂$}
+  → explicate-assign x m c G$₁$ $≡$ (c' , G$₂$)
+  → G$₁$ $↝$ G$₂$
 \end{lstlisting}
-
-
 
 \paragraph{Explicate Predicate is Correct}
 
-...
+The following is the statement of correctness for
+\lstinline{explicate-pred-correct}.
 
 \begin{lstlisting}
 explicate-pred-correct :
-  $∀$ {e$₁$}{c$₁$ c$₂$ c}{b}{v}{s s$′$ s$″$}{$ρ$ $ρ′$ $ρ″$}{G$′$ G$″$ G$‴$}
+  $∀$ {e$₁$}{c$₁$ c$₂$ c}{b}{v}{s s$′$ s$″$}{$ρ$ $ρ′$ $ρ″$}{G G$′$}
   $→$ (s , $ρ$) $⊢$ e$₁$ $⇓$ Bool b $⊣$ (s$′$ , $ρ′$)
-  $→$ ((s$′$ , $ρ′$) , G$′$ $⊢ᶜ$ (if b then c$₂$ else c$₃$) $⇓$ v $⊣$ (s$″$ , $ρ″$))
-  $→$ G$′$ $↝$ G$″$
-  $→$ explicate-pred e$₁$ c$₂$ c$₃$ G$″$ $≡$ (c$₁$ , G$‴$)
-  $→$ (s , $ρ$) , G$‴$ $⊢ᶜ$ c$₁$ $⇓$ v $⊣$ (s$″$ , $ρ″$)
+  $→$ ((s$′$,$ρ′$) , G $⊢ᶜ$ if b then c$₂$ else c$₃$ $⇓$ v $⊣$ (s$″$,$ρ″$))
+  $→$ explicate-pred e$₁$ c$₂$ c$₃$ G $≡$ (c$₁$ , G$′$)
+  $→$ (s , $ρ$) , G$′$ $⊢ᶜ$ c$₁$ $⇓$ v $⊣$ (s$″$ , $ρ″$)
 \end{lstlisting}
 
+\noindent This statement of correctness is interesting because it
+requires the premise that either continuation \lstinline{c$₂$} or
+\lstinline{c$₃$} evaluates to \lstinline{v}, depending on whether the
+expression \lstinline{e$₁$} evaluates to \lstinline{true} or
+\lstinline{false}. This explains the use of Agda's
+\lstinline{if-then-else} in the second premise of
+\lstinline{explicate-pred-correct}.\footnote{The formulation of this
+lemma follows that of CompCert's \lstinline{transl\_condexpr\_prop}.}
+
+The proof of \lstinline{explicate-pred-correct} uses many of the
+monotonicity lemmas that we have already proved, plus one more.
+
+\begin{lstlisting}
+explicate-pred-CFG : $∀${e}{c$₁$ c$₂$ c}{G$₁$ G$₂$}
+  $→$ explicate-pred e c$₁$ c$₂$ G$₁$ $≡$ (c , G$₂$)
+  $→$ G$₁$ $↝$ G$₂$
+\end{lstlisting}
 
 \section{Pass: Select Instructions}
+
+
 
 \section{The Compiler is Correct}
 
