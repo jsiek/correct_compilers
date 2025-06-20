@@ -105,6 +105,7 @@
 %% the next command will enable that style.
 %%\citestyle{acmauthoryear}
 
+\usepackage{url}
 \usepackage{mathpartir}
 \usepackage{listings}
 \usepackage{stmaryrd}
@@ -320,10 +321,10 @@ Intel's x86, the naive approach to compiling boolean expressions and
 conditionals produces embarassingly inefficient code. Similar issues
 arise in the compilation of languages such as Haskell, where the
 case-of-case transformation is employed to optimize dispatching on
-algebraic datatypes \citep{PEYTONJONES19983}.
+algebraic datatypes~\citep{PEYTONJONES19983}.
 
 Olivier Danvy, in his paper \emph{A New One-Pass Transformation into
-Monadic Normal Form}~\citep{Danvy:2003fk}, presents a beautiful family
+Monadic Normal Form}~\citep{Danvy:2003fk}, presents an elegant family
 of structurally recursive functions that translate Boolean expressions
 and conditionals into a monadic normal form that (1) no longer
 contains Boolean expressions, (2) the condition expression of a
@@ -574,6 +575,7 @@ interp-LMonIf : Mon $→$ Inputs $→$ Maybe Value
 \end{lstlisting}
 
 \subsection{Structured Imperative IR}
+\label{sec:imp}
 
 The third language replaces the \lstinline{Let} bindings with
 assignment expressions but retains the structured control-flow and
@@ -649,14 +651,20 @@ data CStmt : Set where
   IfEq : Atm $→$ Atm $→$ Id $→$ Id $→$ CStmt
   Goto : Id $→$ CStmt
 
+CFG = List CStmt
+
 data CProg : Set where
-  Program : $ℕ$ $→$ Id $→$ List CStmt $→$ CProg
+  Program : $ℕ$ $→$ Id $→$ CFG $→$ CProg
 \end{lstlisting}
 
 Note that the \lstinline{CStmt} type represents not just one statement
-but a block of statements that always end in either a
+but a sequence of statements that always end in either a
 \lstinline{Return} statement (that halts the program) or a jump to
-another block (\lstinline{Goto} or \lstinline{IfEq}).
+another \lstinline{CStmt} via \lstinline{Goto} or \lstinline{IfEq}.
+The control flow graph \lstinline{CFG} is a list of \lstinline{CStmt},
+and jump labels are indexes into that list.  So \lstinline{Program}
+consists of (1) the number of variables, (2) the index of the start
+node, (3) the control flow graph.
 
 We choose a big-step semantics for C-like language because the
 semantics is no longer structurally recursive and furthermore,
@@ -664,27 +672,27 @@ programs are no longer guaranteed to terminate.\footnote{The programs
 in the image of Explicate Control are guaranteed to terminate, but
 Agda doesn't know that.}  So encoding the semantics as a function in
 Agda would come with complications (such as using a gas parameter)
-that can be side-stepped by using a big-step semantics. Compared to
-the semantics for the imperative IR, this semantics refers to a list
-of blocks $B$ that can be the targets of gotos.
+that we side-step by using a big-step semantics. Compared to the
+semantics for the imperative IR, this semantics includes a parameter
+for the control flow graph.
 
 \begin{lstlisting}
-data _,_$⊢ᶜ$_$⇓$_$⊣$_ : StateImp $→$ List CStmt $→$ CStmt
+data _,_$⊢ᶜ$_$⇓$_$⊣$_ : StateImp $→$ CFG $→$ CStmt
                       $→$ Value $→$ StateImp $→$ Set
 \end{lstlisting}
 
-The rule for \lstinline{Goto} looks up the block for label $l$ and
-executes that block.
+The rule for \lstinline{Goto} looks up the CFG node for label $l$ and
+executes the sequence of statements in that node.
 \[
-\inferrule{s , B ⊢ᶜ B[l] ⇓ v ⊣ s′}
-          {s , B ⊢ᶜ \mathtt{Goto}~ l ⇓ v ⊣ s′}
+\inferrule{s , G ⊢ᶜ G[l] ⇓ v ⊣ s′}
+          {s , G ⊢ᶜ \mathtt{Goto}~ l ⇓ v ⊣ s′}
 \]
 \noindent The rule for \lstinline{IfEq}, in the case when the
 arguments are equal, is as follows:
 \[
 \inferrule{\texttt{interp-CExp}(\mathtt{Eq}~a_1~a_2) = \mathsf{just}~\mathsf{true} \\
-           s , B ⊢ᶜ B[l_1] ⇓ v ⊣ s′}
-          {s , B ⊢ᶜ \mathtt{IfEq}~a_1~a_2~l_1~l_2 ⇓ v ⊣ s′}
+           s , G ⊢ᶜ G[l_1] ⇓ v ⊣ s′}
+          {s , G ⊢ᶜ \mathtt{IfEq}~a_1~a_2~l_1~l_2 ⇓ v ⊣ s′}
 \]
 
 \noindent The semantics of whole programs is given by the following
@@ -838,6 +846,8 @@ rco (Sub e$₁$ e$₂$)
 yet figured out how to do that while accounting for the necessary
 shifting of de Bruijn indices.)
 
+\subsection{Remove Complex Operands is Correct}
+
 The correctness theorem for Remove Complex Operands says that for any
 program $e$, interpreting $\mathtt{rco}\,e$ with input $s$ yields the
 same output as directly interpreting $e$ with the same input.
@@ -941,6 +951,8 @@ The case of \lstinline{lift-locals-mon} for \lstinline{If} is also
 complicated because there are three subexpressions that must all be
 shifted appropriately.
 
+\subsection{Lift Locals is Correct}
+
 The correctness theorem for Lift Locals says that if a program output
 is $v$ given input $s$, then Lift Locals produces a program that
 outputs the same value given the same input.
@@ -995,6 +1007,298 @@ $⇓$shifts : $∀${e}{v}{s $s′$}{$ρ₁$ $ρ′₁$ $ρ₂$ $ρ₃$ $ρ′₃
 
 
 \section{Pass: Explicate Control}
+
+The Explicate Control pass is responsible for translating from the
+structured control-flow of an abstract syntax \emph{tree} into a
+language with a goto-based control flow \emph{graph}.\footnote{Our
+source language does not include loops, so the graph happens to be a
+directed acyclic graph.} In particular, Explicate Control translates
+\lstinline{If} expressions, whose conditions may be arbitrary
+expressions that include other \lstinline{If} expressions, into the
+\lstinline{IfEq} form that only branches based on an equality test. In
+so doing, Explicate Control brings together uses of the \lstinline{Eq}
+comparison operator and the \lstinline{If} expressions that depend on
+them, thereby avoiding the needless extra code that would be generated
+by a naive approach.
+
+We implement the Explicate Control pass with four functions in Agda,
+the \lstinline{explicate} function translates a whole program from the
+imperative IR to the C-like language, but it delegates all the work to
+the other three functions. These three functions are organized
+according to the context in which they are called. Reviewing the
+grammar of \lstinline{Imp-Exp} (section~\ref{sec:imp}), there are
+three contexts in which an \lstinline{Imp-Exp} may appear:
+\begin{enumerate}
+\item Tail position: the result of the expression is the output of the program,
+\item Assignment: the result of the expression is assigned to a variable, and
+\item Predicate: the (Boolean) result of the expression determines which
+    branch to take in a conditional.
+\end{enumerate}
+
+The functions for Assignment and Predicate have extra parameters for
+their continuations, one for Assignment and two for Predicate. The
+continuations are represented simply as the generated code in the
+C-like IL. The function for Tail position of course needs no
+continuation parameter.
+
+All three functions will be building a control flow graph, which needs
+to be threaded into and out of these functions, so they use the
+following a \lstinline{Build} monad:
+
+\begin{lstlisting}
+Build A = CFG $→$ A × CFG
+retB : {A : Set} $→$ A $→$ Build A
+_thenB_ : {A B : Set} $→$ Build A $→$ (A $→$ Build B)
+           $→$ Build B
+add-node : CStmt $→$ Build Id
+\end{lstlisting}
+
+\noindent Here are the signatures of the four functions that make up
+the Explicate Control pass. Next we discuss select cases of these
+functions.
+
+\begin{lstlisting}
+explicate : Imp-Prog $→$ CProg
+explicate-tail : Imp-Exp $→$ Build CStmt
+explicate-assign : Id $→$ Imp-Exp $→$ CStmt $→$ Build CStmt
+explicate-pred : Imp-Exp $→$ CStmt $→$ CStmt $→$ Build CStmt
+\end{lstlisting}
+
+\paragraph{Explicate Tail}
+
+Starting with \lstinline{explicate-tail}, in the case of an atomic
+expression or primitive operator, we generate a return statement.
+Here is the case for subtraction.
+
+\begin{lstlisting}
+explicate-tail (Sub a$₁$ a$₂$) = retB (Return (Sub a$₁$ a$₂$))
+\end{lstlisting}
+
+\noindent Moving on to the assignment statement, we see a pattern of
+compiling the program in reverse. We first compile the continuation
+\lstinline{e$₂$}, which is in tail position, producing the code \lstinline{c$₂$}.
+We then compile \lstinline{e$₁$}, which is in assignment position,
+passing \lstinline{c$₂$} as its continuation.
+
+\begin{lstlisting}
+explicate-tail (Assign x e$₁$ e$₂$) =
+    (explicate-tail e$₂$) thenB
+    $λ$ c$₂$ $→$ explicate-assign x e$₁$ c$₂$
+\end{lstlisting}
+
+\noindent Regarding a conditional expression, we first compile the two
+branches, \lstinline{e$₂$} and \lstinline{e$₃$}, which are both in tail
+position, and then compile the condition \lstinline{e$₁$}, which is in
+predicate position, so we pass \lstinline{c$₂$} and \lstinline{c$₃$} in
+the continuation parameters.
+
+\begin{lstlisting}
+explicate-tail (If e$₁$ e$₂$ e$₃$) =
+  (explicate-tail e$₂$) thenB
+  $λ$ c$₂$ $→$ (explicate-tail e$₃$) thenB
+  $λ$ c$₃$ $→$ explicate-pred e$₁$ c$₂$ c$₃$
+\end{lstlisting}
+
+\paragraph{Explicate Assignments}
+
+Turning to \lstinline{explicate-assign}, in each base case (for
+atomics and primitive operators), we simply generate an assignment
+statement with continuation \lstinline{c}.
+
+\begin{lstlisting}
+explicate-assign x (Atom a) c =
+  retB (Assign x (Atom a) c)
+\end{lstlisting}
+
+The case for conditional expressions is interesting: we do not
+directly generate an assignment statement. The two branches,
+\lstinline{e$₂$} and \lstinline{e$₃$}, are in assignment position,
+so we recursively compile them with \lstinline{explicate-assign}.
+They both have the same continuation \lstinline{c} and the first rule
+of compilation is that you cannot duplicate code.\footnote{GHC
+violated this rule a decade ago:
+\url{https://stackoverflow.com/questions/35815503/what-ghc-optimization-is-responsible-for-duplicating-case-expressions}.}
+Thus, we add \lstinline{c} to the control-flow graph and
+instead use a \lstinline{Goto} to its label as the continuation
+for \lstinline{e$₂$} and \lstinline{e$₃$}.
+
+\begin{lstlisting}
+explicate-assign y (If e$₁$ e$₂$ e$₃$) c =
+   add-node c thenB
+   $λ$ l $→$ explicate-assign y e$₂$ (Goto l) thenB
+   $λ$ c$₂$ $→$ explicate-assign y e$₃$ (Goto l) thenB
+   $λ$ c$₃$ $→$ explicate-pred e$₁$ c$₂$ c$₃$
+\end{lstlisting}
+
+\paragraph{Explicate Predicates}
+
+The base cases for \lstinline{explicate-pred} are interesting.  If the
+expression is a literal \lstinline{true} or \lstinline{false}, then we
+return the continuation for the \lstinline{thn} or \lstinline{els}
+branch, respectively. (This may case \lstinline{thn} or
+\lstinline{els} to become dead code, which we discuss later.)
+
+\begin{lstlisting}
+explicate-pred (Atom (Bool true)) thn els = retB thn
+explicate-pred (Atom (Bool false)) thn els = retB els
+\end{lstlisting}
+
+\noindent In the case of a variable, we compare it to \lstinline{true}
+and branch to either the \lstinline{thn} or \lstinline{els}
+continuations. However, the syntax of \lstinline{IfEq} requires labels
+to jump to, so we add both continuations to the CFG.
+
+\begin{lstlisting}
+explicate-pred (Atom (Var x)) thn els =
+  add-node thn thenB
+  $λ$ l$₁$ $→$ add-node els thenB
+  $λ$ l$₂$ $→$ retB (IfEq (Var x) (Bool true) l$₁$ l$₂$)
+\end{lstlisting}
+
+\noindent The case for an equality comparison delivers on one of the
+goals of Explicate Control, which is to combine comparison expressions
+with branching whenever possible.
+
+\begin{lstlisting}
+explicate-pred (Eq a$₁$ a$₂$) thn els =
+  add-node thn thenB
+  $λ$ l$₁$ $→$ add-node els thenB
+  $λ$ l$₂$ $→$ retB (IfEq a$₁$ a$₂$ l$₁$ l$₂$)
+\end{lstlisting}
+
+For the finale of the Explicate Control pass, we discuss the
+translation of conditionals in \lstinline{explicate-pred}.  The two
+branches \lstinline{e$₂$} and \lstinline{e$₃$} are in predicate
+position, so we compile them with recursive calls to
+\lstinline{explicate-pred} to obtain \lstinline{c$₂$} and
+\lstinline{c$₃$}. However, they share the same two continuations,
+\lstinline{thn} and \lstinline{els}, so we add both of them to the CFG
+to avoid code duplication. Finally, we compile \lstinline{e$₁$} with
+\lstinline{explicate-pred}, passing \lstinline{c$₂$} and
+\lstinline{c$₃$} as the continuations.
+
+\begin{lstlisting}
+explicate-pred (If e$₁$ e$₂$ e$₃$) thn els =
+   add-node thn thenB
+   $λ$ l$₁$ $→$ add-node els thenB
+   $λ$ l$₂$ $→$ explicate-pred e$₂$ (Goto l$₁$) (Goto l$₂$) thenB
+   $λ$ c$₂$ $→$ (explicate-pred e$₃$ (Goto l$₁$) (Goto l$₂$)) thenB
+   $λ$ c$₃$ $→$ explicate-pred e$₁$ c$₂$ c$₃$
+\end{lstlisting}
+
+\noindent The above handling of \lstinline{If} happens to perform the
+case-of-case optimization~\citep{PEYTONJONES19983}.
+
+\paragraph{Discussion}
+
+Throughout the Explicate Control pass we added code to the
+control-flow graph whenever we needed to avoid code
+duplication. However, some further care is needed to avoid adding (1)
+trivial nodes that only contain a \lstinline{Goto} and (2) nodes that
+are never the target of a jump (i.e., dead code). The
+\lstinline{add-node} function can easily handle (1) by inspecting its
+argument and if it is a \lstinline{Goto}, just return its label
+instead of adding a new node to the CFG.  Avoiding dead code (2) is
+more challenging, either requiring a post-processing of the CFG or use
+lazy evaluation to delay the addition of nodes to the CFG to the point
+where they are definitely needed~\citep{Siek:2023tr}.
+
+\subsection{Explicate Control is Correct}
+
+The correctness theorem for Explicate Control says that if a program
+output is $v$ given input $s$, then Explicate Control produces a
+program that outputs the same value given the same input.
+
+\begin{lstlisting}
+explicate-correct : $∀$ {p}{s}{v}
+  $→$ interp-imp p s v
+  $→$ interp-prog (explicate p) s v
+\end{lstlisting}
+
+The correctness theorem delegates to three lemmas, one for each
+\lstinline{explicate-*} function.
+
+\paragraph{Explicate Tail is Correct}
+
+The statement of the lemma for \lstinline{explicate-tail} is the most
+straightforward. If expression \lstinline{e} compiles to
+\lstinline{c}, and if \lstinline{e} evaluates to \lstinline{v}, then
+\lstinline{c} also evaluates to \lstinline{v}:
+\begin{lstlisting}
+explicate-tail-correct :
+  $∀${e}{$ρ$ $ρ'$}{s s'}{G G$′$}{c}{v}
+  $→$ (s , $ρ$) $⊢$ e $⇓$ v $⊣$ (s' , $ρ'$)
+  $→$ explicate-tail e G $≡$ (c , G$′$)
+  $→$ (s , $ρ$) , G$′$ $⊢ᶜ$ c $⇓$ v $⊣$ (s' , $ρ'$)
+\end{lstlisting}
+\noindent The cases in the proof of \lstinline{explicate-tail-correct}
+for assignment and conditional expressions rely on the correctness
+lemmas for \lstinline{explicate-assign} and
+\lstinline{explicate-pred}.
+
+The case for conditional expressions also requires a lemma about the
+monotonicity of the control flow graph.  The induction hypothesis for
+\lstinline{e$₂$} says that the generated \lstinline{c$₂$} evaluates
+using the CFG that was produced by the compilation of
+\lstinline{e$₂$}, but to satisfy the induction hypothesis
+for \lstinline{e$₁$} we need \lstinline{c$₂$} evaluated using the CFG
+that was produced by the compilation of \lstinline{e$₃$}.
+We define the following notation for
+expression that one CFG is a prefix of another CFG:
+\begin{lstlisting}
+G$₁$ $↝$ G$₂$ = $∃$[ G ] G$₁$ ++ G $≡$ G$₂$
+\end{lstlisting}
+\noindent We prove the following lemma which states that the ouput CFG of
+\lstinline{explicate-tail} is an extension of its input CFG.
+\begin{lstlisting}
+explicate-tail-CFG : $∀${e}{G$₁$ G$₂$}{c}
+  $→$ explicate-tail e G$₁$ $≡$ (c , G$₂$)
+  $→$ G$₁$ $↝$ G$₂$
+\end{lstlisting}
+
+\paragraph{Explicate Assign is Correct}
+
+The correctness lemma for \lstinline{explicate-assign} adds another
+premise which states that the continuation \lstinline{c$₂$} evaluates
+in an environment that was updated by the assignment.
+
+\begin{lstlisting}
+explicate-assign-correct :
+  $∀${x}{e$₁$}{c$₂$}{$ρ$ $ρ′$ $ρ″$}{s s$′$ s$″$}{G G$′$}{c$₁$}{n v}
+  $→$ (s , $ρ$) $⊢$ e$₁$ $⇓$ n $⊣$ (s$′$ , $ρ′$)
+  $→$ (s$′$ , update $ρ′$ x n) , G $⊢ᶜ$ c$₂$ $⇓$ v $⊣$ (s$″$ , $ρ″$)
+  $→$ explicate-assign x e$₁$ c$₂$ G $≡$ (c$₁$ , G$′$)
+  $→$ (s , $ρ$) , G$′$ $⊢ᶜ$ c$₁$ $⇓$ v $⊣$ (s$″$ , $ρ″$)
+\end{lstlisting}
+
+\noindent The case for conditional expressions needs a couple more
+lemmas regarding control flow graphs. Similar to
+\lstinline{explicate-tail}, we need a lemma which states that the
+ouput CFG of \lstinline{explicate-assign} is an extension of its input
+CFG.
+
+\begin{lstlisting}
+explicate-assign-CFG : ∀{x}{m}{t t'}{G₁ G₂}
+  → explicate-assign x m t G₁ ≡ (t' , G₂)
+  → G₁ ↝ G₂
+\end{lstlisting}
+
+
+
+\paragraph{Explicate Predicate is Correct}
+
+...
+
+\begin{lstlisting}
+explicate-pred-correct :
+  $∀$ {e$₁$}{c$₁$ c$₂$ c}{b}{v}{s s$′$ s$″$}{$ρ$ $ρ′$ $ρ″$}{G$′$ G$″$ G$‴$}
+  $→$ (s , $ρ$) $⊢$ e$₁$ $⇓$ Bool b $⊣$ (s$′$ , $ρ′$)
+  $→$ ((s$′$ , $ρ′$) , G$′$ $⊢ᶜ$ (if b then c$₂$ else c$₃$) $⇓$ v $⊣$ (s$″$ , $ρ″$))
+  $→$ G$′$ $↝$ G$″$
+  $→$ explicate-pred e$₁$ c$₂$ c$₃$ G$″$ $≡$ (c$₁$ , G$‴$)
+  $→$ (s , $ρ$) , G$‴$ $⊢ᶜ$ c$₁$ $⇓$ v $⊣$ (s$″$ , $ρ″$)
+\end{lstlisting}
+
 
 \section{Pass: Select Instructions}
 

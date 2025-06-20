@@ -191,7 +191,7 @@ select-exp-correct (Eq a₁ a₂) ρ s s′ dest regs v B ie regs-pos dest-ok
 ⇓-++-halt {is1 = i ∷ is1} (⇓cons x is1⇓) is2⇓ = ⇓cons x (⇓-++-halt is1⇓ is2⇓)
 ⇓-++-halt {is1 = i ∷ is1} (⇓cons-halt x) is2⇓ = ⇓cons-halt x
 
-select-stmt-correct : ∀ (st : CStmt) (ρ ρ′ : Env Value) (s s′ : Inputs) (regs : List Value) (v : Value) (B : List CStmt)
+select-stmt-correct : ∀ (st : CStmt) (ρ ρ′ : Env Value) (s s′ : Inputs) (regs : List Value) (v : Value) (B : CFG)
   → (s , ρ) , B ⊢ᶜ st ⇓ v ⊣ (s′ , ρ′)
   → 0 < length regs
   → Σ[ regs′ ∈ Env Value ] Σ[ b ∈ 𝔹 ]

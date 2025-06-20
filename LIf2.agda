@@ -321,8 +321,11 @@ data CStmt : Set where
   IfEq : Atm → Atm → Id → Id → CStmt
   Goto : Id → CStmt
 
+CFG : Set
+CFG = List CStmt
+
 data CProg : Set where
-  Program : ℕ → Id → List CStmt → CProg
+  Program : ℕ → Id → CFG → CProg
 
 interp-CExp : CExp → Env Value → Reader Value
 interp-CExp (Atom atm) ρ = try (interp-atm atm ρ)
@@ -336,74 +339,74 @@ interp-CExp (Eq a₁ a₂) ρ =
   λ v₁ → try (interp-atm a₂ ρ) then
   λ v₂ → try (equal v₁ v₂)
 
-data _,_⊢ᶜ_⇓_⊣_ : StateImp → List CStmt → CStmt → Value → StateImp → Set where
-  ⇓return : ∀{s s' ρ B e v}
+data _,_⊢ᶜ_⇓_⊣_ : StateImp → CFG → CStmt → Value → StateImp → Set where
+  ⇓return : ∀{s s' ρ G e v}
      → interp-CExp e ρ s ≡ just (v , s')
-     → (s , ρ) , B ⊢ᶜ Return e ⇓ v ⊣ (s' , ρ)
-  ⇓assign : ∀{s ρ B s′ sρ″ x e₁ e₂ v₁ v₂}
+     → (s , ρ) , G ⊢ᶜ Return e ⇓ v ⊣ (s' , ρ)
+  ⇓assign : ∀{s ρ G s′ sρ″ x e₁ e₂ v₁ v₂}
      → interp-CExp e₁ ρ s ≡ just (v₁ , s′)
-     → (s′ , update ρ x v₁) , B ⊢ᶜ e₂  ⇓ v₂ ⊣ sρ″ 
-     → (s , ρ) , B ⊢ᶜ Assign x e₁ e₂ ⇓ v₂ ⊣ sρ″ 
-  ⇓if-true : ∀{s ρ B s′ a₁ a₂ v₁ v₂ v t thn els}
+     → (s′ , update ρ x v₁) , G ⊢ᶜ e₂  ⇓ v₂ ⊣ sρ″ 
+     → (s , ρ) , G ⊢ᶜ Assign x e₁ e₂ ⇓ v₂ ⊣ sρ″ 
+  ⇓if-true : ∀{s ρ G s′ a₁ a₂ v₁ v₂ v t thn els}
      → interp-atm a₁ ρ ≡ just v₁
      → interp-atm a₂ ρ ≡ just v₂
      → equal v₁ v₂ ≡ just (Bool true)
-     → nth B thn ≡ just t
-     → (s , ρ) , B ⊢ᶜ t ⇓ v ⊣ s′
-     → (s , ρ) , B ⊢ᶜ IfEq a₁ a₂ thn els ⇓ v ⊣ s′
-  ⇓if-false : ∀{s ρ B s′ a₁ a₂ v₁ v₂ v t thn els}
+     → nth G thn ≡ just t
+     → (s , ρ) , G ⊢ᶜ t ⇓ v ⊣ s′
+     → (s , ρ) , G ⊢ᶜ IfEq a₁ a₂ thn els ⇓ v ⊣ s′
+  ⇓if-false : ∀{s ρ G s′ a₁ a₂ v₁ v₂ v t thn els}
      → interp-atm a₁ ρ ≡ just v₁
      → interp-atm a₂ ρ ≡ just v₂
      → equal v₁ v₂ ≡ just (Bool false)
-     → nth B els ≡ just t
-     → (s , ρ) , B ⊢ᶜ t ⇓ v ⊣ s′
-     → (s , ρ) , B ⊢ᶜ IfEq a₁ a₂ thn els ⇓ v ⊣ s′
-  ⇓goto : ∀ {s B l v s′ t}
-     → nth B l ≡ just t
-     → s , B ⊢ᶜ t ⇓ v ⊣ s′ 
-     → s , B ⊢ᶜ Goto l ⇓ v ⊣ s′ 
+     → nth G els ≡ just t
+     → (s , ρ) , G ⊢ᶜ t ⇓ v ⊣ s′
+     → (s , ρ) , G ⊢ᶜ IfEq a₁ a₂ thn els ⇓ v ⊣ s′
+  ⇓goto : ∀ {s G l v s′ t}
+     → nth G l ≡ just t
+     → s , G ⊢ᶜ t ⇓ v ⊣ s′ 
+     → s , G ⊢ᶜ Goto l ⇓ v ⊣ s′ 
 
 interp-prog : CProg → Inputs → Value → Set
-interp-prog (Program n l B) s v =
-    Σ[ s′ ∈ StateImp ] (s , (replicate n (Int 0ℤ))) , B ⊢ᶜ Goto l ⇓ v ⊣ s′ 
+interp-prog (Program n l G) s v =
+    Σ[ s′ ∈ StateImp ] (s , (replicate n (Int 0ℤ))) , G ⊢ᶜ Goto l ⇓ v ⊣ s′ 
 
 ----------------- Explicate Control ----------------------------
 
-Blocker : Set → Set
-Blocker A = List CStmt → A × List CStmt
+Build : Set → Set
+Build A = CFG → A × CFG
 
-returnB : ∀{A : Set} → A → Blocker A
-returnB a s = a , s
+retB : {A : Set} → A → Build A
+retB a s = a , s
 
-_thenB_ : ∀{A B : Set} → Blocker A → (A → Blocker B) → Blocker B
+_thenB_ : {A B : Set} → Build A → (A → Build B) → Build B
 (M thenB g) s
     with M s
 ... | (v , s') = g v s'
 
-create-block : CStmt → Blocker Id
-create-block t B = length B , (B ++ [ t ])
+add-node : CStmt → Build Id
+add-node c B = length B , (B ++ [ c ])
 
-explicate-assign : Id → Imp-Exp → CStmt → Blocker CStmt
-explicate-tail : Imp-Exp → Blocker CStmt
-explicate-pred : Imp-Exp → CStmt → CStmt → Blocker CStmt
+explicate-assign : Id → Imp-Exp → CStmt → Build CStmt
+explicate-tail : Imp-Exp → Build CStmt
+explicate-pred : Imp-Exp → CStmt → CStmt → Build CStmt
 
-explicate-assign x (Atom a) rest = returnB (Assign x (Atom a) rest)
-explicate-assign x Read rest = returnB (Assign x Read rest)
-explicate-assign x (Sub a₁ a₂) rest = returnB (Assign x (Sub a₁ a₂) rest)
-explicate-assign x (Eq a₁ a₂) rest = returnB (Assign x (Eq a₁ a₂) rest)
-explicate-assign x (Assign y e₁ e₂) rest =
-   (explicate-assign x e₂ rest) thenB
+explicate-assign x (Atom a) c = retB (Assign x (Atom a) c)
+explicate-assign x Read c = retB (Assign x Read c)
+explicate-assign x (Sub a₁ a₂) c = retB (Assign x (Sub a₁ a₂) c)
+explicate-assign x (Eq a₁ a₂) c = retB (Assign x (Eq a₁ a₂) c)
+explicate-assign x (Assign y e₁ e₂) c =
+   (explicate-assign x e₂ c) thenB
    λ t₂ → explicate-assign y e₁ t₂
-explicate-assign y (If e₁ e₂ e₃) rest =
-   create-block rest thenB
+explicate-assign y (If e₁ e₂ e₃) c =
+   add-node c thenB
    λ l → explicate-assign y e₂ (Goto l) thenB
    λ t₂ → explicate-assign y e₃ (Goto l) thenB
    λ t₃ → explicate-pred e₁ t₂ t₃
     
-explicate-tail (Atom a) = returnB (Return (Atom a))
-explicate-tail Read = returnB (Return Read)
-explicate-tail (Sub a₁ a₂) = returnB (Return (Sub a₁ a₂))
-explicate-tail (Eq a₁ a₂) = returnB (Return (Eq a₁ a₂))
+explicate-tail (Atom a) = retB (Return (Atom a))
+explicate-tail Read = retB (Return Read)
+explicate-tail (Sub a₁ a₂) = retB (Return (Sub a₁ a₂))
+explicate-tail (Eq a₁ a₂) = retB (Return (Eq a₁ a₂))
 explicate-tail (Assign x e₁ e₂) =
     (explicate-tail e₂) thenB
     λ t₂ → explicate-assign x e₁ t₂
@@ -412,33 +415,34 @@ explicate-tail (If e₁ e₂ e₃) =
   λ t₂ → (explicate-tail e₃) thenB
   λ t₃ → explicate-pred e₁ t₂ t₃
 
-explicate-pred (Atom a) thn els =
-  create-block thn thenB
-  λ l₁ → create-block els thenB
-  λ l₂ → returnB (IfEq a (Bool true) l₁ l₂)
-explicate-pred Read thn els = returnB (Return (Atom (Num 0ℤ)))
-explicate-pred (Sub a₁ a₂) thn els = returnB (Return (Atom (Num 0ℤ)))
+explicate-pred (Atom (Num x)) thn els = retB (Return (Atom (Num 0ℤ)))
+explicate-pred (Atom (Bool false)) thn els = retB els
+explicate-pred (Atom (Bool true)) thn els = retB thn
+explicate-pred (Atom (Var x)) thn els =
+  add-node thn thenB
+  λ l₁ → add-node els thenB
+  λ l₂ → retB (IfEq (Var x) (Bool true) l₁ l₂)
+explicate-pred Read thn els = retB (Return (Atom (Num 0ℤ)))
+explicate-pred (Sub a₁ a₂) thn els = retB (Return (Atom (Num 0ℤ)))
 explicate-pred (Eq a₁ a₂) thn els =
-  create-block thn thenB
-  λ lbl-thn → create-block els thenB
-  λ lbl-els → returnB (IfEq a₁ a₂ lbl-thn lbl-els)
+  add-node thn thenB
+  λ lbl-thn → add-node els thenB
+  λ lbl-els → retB (IfEq a₁ a₂ lbl-thn lbl-els)
 explicate-pred (Assign x e₁ e₂) thn els =
   explicate-pred e₂ thn els thenB
-  λ rest' → explicate-assign x e₁ rest'
+  λ c → explicate-assign x e₁ c
 explicate-pred (If e₁ e₂ e₃) thn els =
-    create-block thn thenB
-   λ lbl-thn → create-block els thenB
+    add-node thn thenB
+   λ lbl-thn → add-node els thenB
    λ lbl-els → explicate-pred e₂ (Goto lbl-thn) (Goto lbl-els) thenB
    λ t₂ → (explicate-pred e₃ (Goto lbl-thn) (Goto lbl-els)) thenB
    λ t₃ → explicate-pred e₁ t₂ t₃
 
-
 explicate : Imp-Prog → CProg
 explicate (Program n e)
     with ((explicate-tail e) thenB
-          (λ t → create-block t)) []
+          (λ t → add-node t)) []
 ... | lbl , B = Program n lbl B
---  ? Program n (explicate-tail e)
 
 ----------------- Definition of X86Var ----------------------------
 
@@ -558,7 +562,7 @@ select-exp (Eq a₁ a₂) dest =
   
 select-stmt : CStmt → List Inst
 select-stmt (Return e) = select-exp e (Reg rax)
-select-stmt (Assign x e rest) = (select-exp e (Var x)) ++ (select-stmt rest)
+select-stmt (Assign x e c) = (select-exp e (Var x)) ++ (select-stmt c)
 select-stmt (IfEq a₁ a₂ thn els) =
   CmpQ (to-arg a₁) (to-arg a₂) ∷ JmpEq thn ∷ Jmp els ∷ []
 select-stmt (Goto l) = Jmp l ∷ [] 
