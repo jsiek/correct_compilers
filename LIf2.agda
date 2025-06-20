@@ -3,10 +3,11 @@ module LIf2 where
 open import Agda.Builtin.Unit
 open import Data.Nat using (ℕ; zero; suc; _≤ᵇ_; _<_; _+_; _≡ᵇ_)
 open import Data.Nat.Properties
-open import Data.Product
+open import Data.Product hiding (map)
 open import Data.Integer using (ℤ; -_; _-_; 0ℤ)
 open import Data.List
-open import Data.Maybe
+open import Data.Maybe hiding (map)
+open import Function.Base using (_∘_)
 open import Relation.Binary.PropositionalEquality
    using (_≡_; refl; trans; sym; cong; cong-app)
 open import Agda.Builtin.Bool renaming (Bool to 𝔹)
@@ -549,34 +550,31 @@ to-arg (Num n) = Num n
 to-arg (Bool b) = Bool b
 to-arg (Var x) = Var x
 
-select-exp : CExp → Dest → List Inst
-select-exp (Atom a) dest = [ MovQ (to-arg a) dest ]
-select-exp Read dest = ReadInt ∷ (MovQ (Reg rax) dest) ∷ []
-select-exp (Sub a₁ a₂) dest =
-  -- was:
-  -- MovQ (to-arg a₁) dest ∷ (SubQ (to-arg a₂) dest) ∷ []
-  -- but if dest = a₂, there's a problem.
-  MovQ (to-arg a₁) (Reg rax) ∷ (SubQ (to-arg a₂) (Reg rax)) ∷ MovQ (Reg rax) dest ∷ []
-select-exp (Eq a₁ a₂) dest =
-  CmpQ (to-arg a₁) (to-arg a₂) ∷ MovQ (Reg rax) dest ∷ []
+select-assign : CExp → Dest → List Inst
+select-assign (Atom a) dest = MovQ (to-arg a) dest ∷ []
+select-assign Read dest = ReadInt ∷ (MovQ (Reg rax) dest) ∷ []
+select-assign (Sub a₁ a₂) dest =
+  MovQ (to-arg a₁) (Reg rax) ∷
+  SubQ (to-arg a₂) (Reg rax) ∷
+  MovQ (Reg rax) dest ∷ []
+select-assign (Eq a₁ a₂) dest =
+  CmpQ (to-arg a₁) (to-arg a₂) ∷
+  MovQ (Reg rax) dest ∷ []
   
 select-stmt : CStmt → List Inst
-select-stmt (Return e) = select-exp e (Reg rax)
-select-stmt (Assign x e c) = (select-exp e (Var x)) ++ (select-stmt c)
+select-stmt (Return e) = select-assign e (Reg rax)
+select-stmt (Assign x e c) = select-assign e (Var x) ++ select-stmt c
 select-stmt (IfEq a₁ a₂ thn els) =
   CmpQ (to-arg a₁) (to-arg a₂) ∷ JmpEq thn ∷ Jmp els ∷ []
 select-stmt (Goto l) = Jmp l ∷ [] 
 
 select-inst : CProg → X86Var
 select-inst (Program n l B) =
-  Program n l (Data.List.map select-stmt B)
+  Program n l (map select-stmt B)
 
 ----------------- Compile ----------------------------
 
 compile : Exp → X86Var
-compile e =
-  let m = rco e in
-  let il = lift-locals m in
-  let c = explicate il in
-  select-inst c
+compile e = (select-inst ∘ explicate ∘ lift-locals ∘ rco) e
+
   

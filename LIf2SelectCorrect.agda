@@ -78,13 +78,13 @@ wrote-write2 (Reg x) s regs regs′ ρ v len-regs′ (RegOK lt) regs-pos = refl 
     nth-up : nth (update regs′ x v) x ≡ just v
     nth-up = nth-update regs′ x v (subst (λ X → x < X) (sym len-regs′) (≤-trans lt regs-pos))
 
-select-exp-correct : ∀ (e : CExp) (ρ : Env Value) (s s′ : Inputs) (dest : Dest) (regs : List Value) (v : Value) (B : List Block) 
+select-assign-correct : ∀ (e : CExp) (ρ : Env Value) (s s′ : Inputs) (dest : Dest) (regs : List Value) (v : Value) (B : List Block) 
   → interp-CExp e ρ s ≡ just (v , s′)
   → 0 < length regs
   → DestOK dest 1
-  → Σ[ st′ ∈ StateX86 ] (s , regs , ρ) , B ⊩ select-exp e dest ⇓ st′ , true × wrote dest v (s′ , regs , ρ) st′
+  → Σ[ st′ ∈ StateX86 ] (s , regs , ρ) , B ⊩ select-assign e dest ⇓ st′ , true × wrote dest v (s′ , regs , ρ) st′
   
-select-exp-correct (Atom a) ρ s s′ dest regs v B ie regs-pos dest-ok
+select-assign-correct (Atom a) ρ s s′ dest regs v B ie regs-pos dest-ok
     with interp-atm a ρ in ia | ie
 ... | just v | refl =
     let m : (s , regs , ρ) , B ⊢ MovQ (to-arg a) dest ⇓ write dest v (s , regs , ρ) , true
@@ -96,7 +96,7 @@ select-exp-correct (Atom a) ρ s s′ dest regs v B ie regs-pos dest-ok
     Goal : interp-arg (to-arg a) (s , regs , ρ) ≡ just v
     Goal rewrite sym (to-arg-correct a ρ s regs) = ia
 
-select-exp-correct Read ρ s s′ dest regs v B ie regs-pos dest-ok =
+select-assign-correct Read ρ s s′ dest regs v B ie regs-pos dest-ok =
   let regs′ = update regs rax v in
   let r : (s , regs , ρ) , B ⊢ ReadInt ⇓ (s′ , regs′ , ρ) , true
       r = ⇓read{s}{s′}{regs}{ρ}{v} ie in
@@ -109,12 +109,12 @@ select-exp-correct Read ρ s s′ dest regs v B ie regs-pos dest-ok =
   nth-up : nth (update regs rax v) rax ≡ just v
   nth-up = nth-update regs rax v regs-pos
 
-select-exp-correct (Sub a₁ a₂) ρ s s′ dest regs v B ie regs-pos dest-ok
+select-assign-correct (Sub a₁ a₂) ρ s s′ dest regs v B ie regs-pos dest-ok
     with interp-atm a₁ ρ in ia₁
 ... | just (Bool b₁)
     with interp-atm a₂ ρ in ia₂ | ie
 ... | just (Int v₂) | ()
-select-exp-correct (Sub a₁ a₂) ρ s s′ dest regs v B ie regs-pos dest-ok
+select-assign-correct (Sub a₁ a₂) ρ s s′ dest regs v B ie regs-pos dest-ok
     | just (Int v₁)
     with interp-atm a₂ ρ in ia₂ | ie
 ... | just (Int v₂) | refl
@@ -154,7 +154,7 @@ select-exp-correct (Sub a₁ a₂) ρ s s′ dest regs v B ie regs-pos dest-ok
     Goal (Reg x) d-ok = refl , nth-update (update (update regs rax (Int v₁)) rax (Int (v₁ - v₂))) x (Int (v₁ - v₂)) (len-up-up-pos x d-ok) , refl ,
           trans (update-length (update (update regs rax (Int v₁)) rax (Int (v₁ - v₂))) x (Int (v₁ - v₂)))
           (trans (update-length (update regs rax (Int v₁)) rax (Int (v₁ - v₂))) (update-length regs rax (Int v₁)))
-select-exp-correct (Eq a₁ a₂) ρ s s′ dest regs v B ie regs-pos dest-ok
+select-assign-correct (Eq a₁ a₂) ρ s s′ dest regs v B ie regs-pos dest-ok
     with interp-atm a₁ ρ in ia₁
 ... | just v₁
     with interp-atm a₂ ρ in ia₂
@@ -197,11 +197,11 @@ select-stmt-correct : ∀ (st : CStmt) (ρ ρ′ : Env Value) (s s′ : Inputs) 
   → Σ[ regs′ ∈ Env Value ] Σ[ b ∈ 𝔹 ]
     (s , regs , ρ) , (map select-stmt B) ⊩ select-stmt st ⇓ (s′ , regs′ , ρ′) , b × nth regs′ rax ≡ just v
 select-stmt-correct (Return e) ρ ρ′ s s′ regs v B (⇓return ie) regs-pos
-    with select-exp-correct e ρ s s′ (Reg rax) regs v (map select-stmt B) ie regs-pos (RegOK (s≤s z≤n))
+    with select-assign-correct e ρ s s′ (Reg rax) regs v (map select-stmt B) ie regs-pos (RegOK (s≤s z≤n))
 ... | (s′ , regs′ , ρ′) , se⇓st′ , refl , nth-rax-v , refl , len-regs′
     = regs′ , true , se⇓st′ , nth-rax-v
 select-stmt-correct (Assign x e st) ρ ρ′ s s′ regs v B (⇓assign{s′ = s′₁}{v₁ = v₁} ie st⇓v) regs-pos
-    with select-exp-correct e ρ s s′₁ (Var x) regs v₁ (map select-stmt B) ie regs-pos VarOK
+    with select-assign-correct e ρ s s′₁ (Var x) regs v₁ (map select-stmt B) ie regs-pos VarOK
 ... | (s′₁ , regs′ , ρ″) , se⇓ , refl , refl , len-regs′ 
     with select-stmt-correct st (update ρ x v₁) ρ′ _ s′ regs′ v B st⇓v (subst (λ X → 0 < X) (sym len-regs′)  regs-pos)
 ... | regs″ , b₂ , sst⇓ , nth-rax-v =
@@ -235,10 +235,10 @@ select-stmt-correct (Goto l) ρ ρ′ s s′ regs v B (⇓goto{t = t} nth t⇓v)
 ... | regs′ , b , st⇓ , nth-rax-v =
     regs′ , false , ⇓cons-halt (⇓jmp{b = b} (nth-map{xs = B} select-stmt nth) st⇓) , nth-rax-v
 
-select-inst-correct : ∀ (p : CProg) (inputs : Inputs) (v : Value)
+select-inst-correct : ∀{p}{inputs}{v}
   → interp-prog p inputs v
   → interp-x86-var (select-inst p) inputs v
-select-inst-correct (Program n l B) inputs v ((s′ , ρ′) , (⇓goto{t = t} nth t⇓v))
+select-inst-correct {Program n l B}{inputs}{v} ((s′ , ρ′) , (⇓goto{t = t} nth t⇓v))
     with select-stmt-correct t (replicate n (Int 0ℤ)) ρ′ inputs s′ [ Int 0ℤ ] v B t⇓v (s≤s z≤n)
 ... | regs′ , b , sst⇓ , nth-rax-v =
     s′ , regs′ , ρ′ , false , ⇓jmp (nth-map{xs = B} select-stmt nth) sst⇓ , nth-rax-v

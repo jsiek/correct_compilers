@@ -177,56 +177,6 @@ literate={→}{{\to}}1,
   \country{USA}
 }
 
-%% \author{Lars Th{\o}rv{\"a}ld}
-%% \affiliation{%
-%%   \institution{The Th{\o}rv{\"a}ld Group}
-%%   \city{Hekla}
-%%   \country{Iceland}}
-%% \email{larst@affiliation.org}
-
-%% \author{Valerie B\'eranger}
-%% \affiliation{%
-%%   \institution{Inria Paris-Rocquencourt}
-%%   \city{Rocquencourt}
-%%   \country{France}
-%% }
-
-%% \author{Aparna Patel}
-%% \affiliation{%
-%%  \institution{Rajiv Gandhi University}
-%%  \city{Doimukh}
-%%  \state{Arunachal Pradesh}
-%%  \country{India}}
-
-%% \author{Huifen Chan}
-%% \affiliation{%
-%%   \institution{Tsinghua University}
-%%   \city{Haidian Qu}
-%%   \state{Beijing Shi}
-%%   \country{China}}
-
-%% \author{Charles Palmer}
-%% \affiliation{%
-%%   \institution{Palmer Research Laboratories}
-%%   \city{San Antonio}
-%%   \state{Texas}
-%%   \country{USA}}
-%% \email{cpalmer@prl.com}
-
-%% \author{John Smith}
-%% \affiliation{%
-%%   \institution{The Th{\o}rv{\"a}ld Group}
-%%   \city{Hekla}
-%%   \country{Iceland}}
-%% \email{jsmith@affiliation.org}
-
-%% \author{Julius P. Kumquat}
-%% \affiliation{%
-%%   \institution{The Kumquat Consortium}
-%%   \city{New York}
-%%   \country{USA}}
-%% \email{jpkumquat@consortium.net}
-
 %%
 %% By default, the full list of authors will be used in the page
 %% headers. Often, this list is too long, and will overlap
@@ -235,9 +185,6 @@ literate={→}{{\to}}1,
 %% of authors' names for this purpose.
 %\renewcommand{\shortauthors}{Trovato et al.}
 
-%%
-%% The abstract is a short summary of the work to be presented in the
-%% article.
 \begin{abstract}
 We present a proof of correctness in Agda for four nanopasses that
 translate a source language with let binding, integer arithmetic,
@@ -318,7 +265,7 @@ language changes from an abstract syntax \emph{tree} into a control
 flow \emph{graph}, or equivalently, an intermediate language with
 \texttt{goto}. Further, when targeting an assembly language such as
 Intel's x86, the naive approach to compiling boolean expressions and
-conditionals produces embarassingly inefficient code. Similar issues
+conditionals produces embarrassingly inefficient code. Similar issues
 arise in the compilation of languages such as Haskell, where the
 case-of-case transformation is employed to optimize dispatching on
 algebraic datatypes~\citep{PEYTONJONES19983}.
@@ -350,8 +297,8 @@ no branching is needed.
 My first exposure to these ideas were in Kent Dybvig's compiler
 course~\citep{Dybvig:2010aa} where he taught the techniques used in
 the Chez Scheme compiler~\citep{Dybvig:2006aa}.  One of those
-techniques is called destintation-driven code
-generation~\cite{Dybvig:1990aa}, which adds an extra parameter to the
+techniques is called destination-driven code
+generation~\citep{Dybvig:1990aa}, which adds an extra parameter to the
 compilation function to indicate how the context will use the result
 value of an expression. The context may (1) ignore the result (and
 only care about the expression's side effects), (2) branch based on
@@ -381,7 +328,7 @@ textbook~\citep{Siek:2023tr,Siek:2023ue}. That book takes an
 incremental approach to teaching compilers, that is, it guides the
 students through the creation of multiple compilers for a sequence of
 languages, each of which adds a language feature to the previous
-langauge. For the language with Boolean expressions and conditionals,
+language. For the language with Boolean expressions and conditionals,
 the Explicate Control pass of the compiler uses the one-function per
 context approach of Danvy to translate into an x86-flavored register
 transfer language.  \emph{Essentials of Compilation} also employs the
@@ -399,7 +346,7 @@ following three passes in \emph{Essentials of Compilation}:
 \item Select Instructions
 \end{enumerate}
 The process of proving of correctness of the Explicate Control pass
-made it clear to me that it has two distinct reponsibilities that
+made it clear to me that it has two distinct responsibilities that
 deserve to be separated:
 \begin{itemize}
 \item Replacing \texttt{let} expressions with assignment statements.
@@ -417,13 +364,12 @@ keeps the name Explicate Control.
 \item Select Instructions
 \end{enumerate}
 
-TODO: roadmap
-
-%% differs in that I also use a big-step semantics for the register
-%% transfer language (instead of small step), which streamlines some of
-%% the reasoning.
+Section~\ref{sec:langs} of the paper introduces the intermediate
+languages. Section~\ref{sec:compiler} describes the compiler,
+detailing each pass and the proof of correctness.
 
 \section{The Languages}
+\label{sec:langs}
 
 In this section we describe how we formalize the syntax and semantics
 of the source language and four intermediate languages in Agda:
@@ -452,12 +398,14 @@ example, the Closure Conversion pass (not discussed here) generates
 code with \texttt{let}, so Closure Conversion comes before Lift
 Locals.
 
-One of the challenges of formalizing semantics in a proof assistant is
-that one needs to choose a representation of variables. There are many
-options, and I've tried most of them. But just like a game of
-whac-a-mole, the savings acheived in one place are lost in others.  My
-current favorite are good old de Bruijn indices. The following type
-\lstinline{Id} is for identifiers.
+One of the perennial challenges of formalizing semantics in a proof
+assistant is that one needs to choose a representation of variables.
+%% There are many
+%% options, and I've tried most of them. But just like a game of
+%% whac-a-mole, the savings achieved in one place are lost in others.
+Of the many options, my current favorite is good old de Bruijn
+indices~\citep{Bruijn:1972kx}.  Thus, identifiers \lstinline{Id} are
+represented as natural numbers.
 
 \begin{lstlisting}
 Id = $ℕ$
@@ -574,6 +522,11 @@ interp-mon : Mon $→$ Env Value $→$ Reader Value
 interp-LMonIf : Mon $→$ Inputs $→$ Maybe Value
 \end{lstlisting}
 
+(This intermediate language does not correspond to the monadic normal
+form in Olivier's paper. It is the language of section
+\ref{sec:c-lang} that corresponds to the target of Olivier's one-pass
+transformation.)
+
 \subsection{Structured Imperative IR}
 \label{sec:imp}
 
@@ -626,6 +579,7 @@ interp-imp : Imp-Prog $→$ Inputs $→$ Value $→$ Set
 \end{lstlisting}
 
 \subsection{The C-like language}
+\label{sec:c-lang}
 
 The fourth language is similar to the C programming language in that
 it supports \texttt{goto} and separates expressions from statements.
@@ -707,7 +661,7 @@ interp-prog : CProg $→$ Inputs $→$ Value $→$ Set
 The final intermediate language is a subset of x86 assembly language,
 except for the addition of variables. A complete compiler would
 include a few more passes to perform register allocation and deal with
-idiosyncrosies of x86, such as only allowing at most one instruction
+idiosyncrasies of x86, such as only allowing at most one instruction
 argument to access memory.
 
 \begin{lstlisting}
@@ -785,10 +739,21 @@ The meaning of a whole program is given by the following relation.
 interp-x86-var : X86Var → Inputs → Value → Set
 \end{lstlisting}
     
-We now proceed to discuss each compiler pass and its proof of
-correctness.
+We now proceed to discuss the compiler and its proof of correctness.
 
-\section{Pass: Remove Complex Operands}
+
+\section{The Compiler}
+\label{sec:compiler}
+
+The compiler is simply the composition of the four passes,
+which we detail in the next four subsections.
+
+\begin{lstlisting}
+compile e = (select-inst ∘ explicate ∘ lift-locals ∘ rco) e
+\end{lstlisting}
+
+
+\subsection{Pass: Remove Complex Operands}
 
 We implement the Remove Complex Operands pass with the following
 \lstinline{rco} function in Agda. This pass is responsible for making
@@ -801,7 +766,7 @@ rco : Exp $→$ Mon
 \end{lstlisting}
 
 Most of the cases of \lstinline{rco} are trivial, but let us focus on
-the case for subtraction. We shall start with a strawman
+the case for subtraction. We shall start with a straw-man
 translation. We recursively compile the subexpressions $e_1$ and
 $e_2$. The results might be complex (not atomic), so we
 \lstinline{let} binding them both and replace them in the subtraction
@@ -846,7 +811,7 @@ rco (Sub e$₁$ e$₂$)
 yet figured out how to do that while accounting for the necessary
 shifting of de Bruijn indices.)
 
-\subsection{Remove Complex Operands is Correct}
+\subsubsection{Remove Complex Operands is Correct}
 
 The correctness theorem for Remove Complex Operands says that for any
 program $e$, interpreting $\mathtt{rco}\,e$ with input $s$ yields the
@@ -888,7 +853,7 @@ interp-shift-mon : (m : Mon)(v : Value)($ρ₁$ $ρ₂$ : Env Value)
 \end{lstlisting}
 
 
-\section{Pass: Lift Locals}
+\subsection{Pass: Lift Locals}
 
 The Lift Locals pass is responsible for replacing all of the
 \lstinline{let} expressions with assignment statements.  After this
@@ -934,7 +899,7 @@ shifted up by $i$ because we are moving all of the $i$
 \lstinline{e$₂$}. Regarding the variable that serves as the left-hand
 side of the assignment, its de Bruijn index is $i + j$ because the
 original index for this \lstinline{Let} was $0$ but we have moved $i +
-j$ other \lstinline{let}s above this variable occurence.
+j$ other \lstinline{let}s above this variable occurrence.
 
 \begin{lstlisting}
 lift-locals-mon (Let m$₁$ m$₂$)
@@ -951,7 +916,7 @@ The case of \lstinline{lift-locals-mon} for \lstinline{If} is also
 complicated because there are three subexpressions that must all be
 shifted appropriately.
 
-\subsection{Lift Locals is Correct}
+\subsubsection{Lift Locals is Correct}
 
 The correctness theorem for Lift Locals says that if a program output
 is $v$ given input $s$, then Lift Locals produces a program that
@@ -976,7 +941,7 @@ instead will have entries for all of the variables (we arbitrarily
 initialize them to $0$). So in general, we can separate the
 environment into two halves, $ρ₁$ and $ρ₂$, where $ρ₂$ is for the free
 variables in \lstinline{m} whereas \lstinline{$ρ₁$ ++ $ρ₂$} is for the
-free variables in the result expressoin \lstinline{e} of
+free variables in the result expression \lstinline{e} of
 \lstinline{lift-locals-mon m}. The length of $ρ₁$ corresponds to the
 number returned by \lstinline{lift-locals-mon m}. Also, note that
 because \lstinline{Mon} is a pure language, \lstinline{e} contains a
@@ -1006,7 +971,7 @@ $⇓$shifts : $∀${e}{v}{s $s′$}{$ρ₁$ $ρ′₁$ $ρ₂$ $ρ₃$ $ρ′₃
 \end{lstlisting}
 
 
-\section{Pass: Explicate Control}
+\subsection{Pass: Explicate Control}
 
 The Explicate Control pass is responsible for translating from the
 structured control-flow of an abstract syntax \emph{tree} into a
@@ -1026,7 +991,7 @@ the \lstinline{explicate} function translates a whole program from the
 imperative IR to the C-like language, but it delegates all the work to
 the other three functions. These three functions are organized
 according to the context in which they are called. Reviewing the
-grammar of \lstinline{Imp-Exp} (section~\ref{sec:imp}), there are
+grammar of \lstinline{Imp-Exp} (subsection~\ref{sec:imp}), there are
 three contexts in which an \lstinline{Imp-Exp} may appear:
 \begin{enumerate}
 \item Tail position: the result of the expression is the output of the program,
@@ -1203,7 +1168,7 @@ more challenging, either requiring a post-processing of the CFG or use
 lazy evaluation to delay the addition of nodes to the CFG to the point
 where they are definitely needed~\citep{Siek:2023tr}.
 
-\subsection{Explicate Control is Correct}
+\subsubsection{Explicate Control is Correct}
 
 The correctness theorem for Explicate Control says that if a program
 output is $v$ given input $s$, then Explicate Control produces a
@@ -1248,7 +1213,7 @@ expression that one CFG is a prefix of another CFG:
 \begin{lstlisting}
 G$₁$ $↝$ G$₂$ = $∃$[ G ] G$₁$ ++ G $≡$ G$₂$
 \end{lstlisting}
-\noindent We prove that the ouput CFG of \lstinline{explicate-tail} is
+\noindent We prove that the output CFG of \lstinline{explicate-tail} is
 an extension of its input CFG.
 \begin{lstlisting}
 explicate-tail-CFG : $∀${e}{G$₁$ G$₂$}{c}
@@ -1282,7 +1247,7 @@ explicate-assign-correct :
 
 \noindent The case for conditional expressions needs another lemma
 regarding control flow graphs. Similar to \lstinline{explicate-tail},
-we need a lemma which states that the ouput CFG of
+we need a lemma which states that the output CFG of
 \lstinline{explicate-assign} is an extension of its input CFG.
 
 \begin{lstlisting}
@@ -1323,15 +1288,187 @@ explicate-pred-CFG : $∀${e}{c$₁$ c$₂$ c}{G$₁$ G$₂$}
   $→$ G$₁$ $↝$ G$₂$
 \end{lstlisting}
 
-\section{Pass: Select Instructions}
+\subsection{Pass: Select Instructions}
+
+The responsibility of the Select Instructions pass is to convert the
+assignment statements and primitive operations of the C-like language
+into x86 instructions. The minor challenge is that many x86
+instructions take just two arguments and have an update-in-place
+semantics.
+
+The function \lstinline{select-inst} translation a whole program in
+the C-like language to x86.
+\begin{lstlisting}
+select-inst (Program n l B) =
+  Program n l (map select-stmt B)
+\end{lstlisting}
+
+\noindent The \lstinline{select-stmt} function maps each statement to
+one or more instructions. The return statement is compiled like an
+assignment to the \lstinline{rax} register. (The calling convention
+for x86 says that the return value of a function is passed in
+\lstinline{rax}.) 
+
+\begin{lstlisting}
+select-stmt (Return e) = select-assign e (Reg rax)
+\end{lstlisting}
+
+\noindent For the assignment statement we delegate to the
+\lstinline{select-assign} function, which analyzes the expression
+\lstinline{e} to determine which instruction to generate.
+We describe \lstinline{select-assign} shortly.
+
+\begin{lstlisting}
+select-stmt (Assign x e c) =
+  select-assign e (Var x) ++ select-stmt c
+\end{lstlisting}
+
+\noindent The \lstinline{IfEq} of the C-like language
+is translated to a \lstinline{CmpQ} instruction followed
+by \lstinline{JmpEq} and an unconditional \lstinline{Jmp}.
+
+\begin{lstlisting}
+select-stmt (IfEq a₁ a₂ thn els) =
+  CmpQ (to-arg a₁) (to-arg a₂) ∷
+  JmpEq thn ∷
+  Jmp els ∷ []
+\end{lstlisting}
+
+\noindent Finally, we translate \lstinline{Goto} into a \lstinline{Jmp}.
+\begin{lstlisting}
+select-stmt (Goto l) = Jmp l ∷ [] 
+\end{lstlisting}
+
+Next we look at some representative cases of
+\lstinline{select-assign}. The first parameter is the right-hand side
+of the assignment and the second parameter is the left-hand side, that
+is, the destination. For subtraction, we use the \lstinline{rax}
+register as scratch space. We first move argument \lstinline{a$₁$}
+into \lstinline{rax}, then subtract \lstinline{a$₂$} from
+\lstinline{rax}, and finally move the result into \lstinline{dest}.
+
+\begin{lstlisting}
+select-assign (Sub a$₁$ a$₂$) dest =
+  MovQ (to-arg a$₁$) (Reg rax) $∷$
+  SubQ (to-arg a$₂$) (Reg rax) $∷$
+  MovQ (Reg rax) dest $∷$ []
+\end{lstlisting}
+
+\noindent Of course there are special cases that require fewer
+instructions. For example, if the first argument of the subtraction is
+identical to the destination, then we can simply generate one
+\lstinline{SubQ} instruction. 
+
+\begin{lstlisting}
+select-assign (Sub (Var x) a$₂$) (Var x) = 
+  SubQ (to-arg a$₂$) (Var x) $∷$ []
+\end{lstlisting}
+
+\noindent For the sake of keeping the proof short, we did not include
+any of the special cases.
+
+We compile the assignment of an equality comparison into a
+\lstinline{CmpQ} and a \lstinline{MovQ}. The \lstinline{CmpQ} always
+puts its result into \lstinline{rax}, so the \lstinline{MovQ} is
+needed to place the result into the destination.\footnote{The real
+\lstinline{cmpq} instruction is slightly stranger, involving
+the \lstinline{EFLAGS} register.}
+
+\begin{lstlisting}
+select-assign (Eq a$₁$ a$₂$) dest =
+  CmpQ (to-arg a$₁$) (to-arg a$₂$) $∷$
+  MovQ (Reg rax) dest $∷$ []
+\end{lstlisting}
 
 
+\subsubsection{Select Instructions is Correct}
 
-\section{The Compiler is Correct}
+The correctness theorem for Select Instructions says that if a program
+output is $v$ given input $s$, then Explicate Control produces a
+program that outputs the same value given the same input.
+
+\begin{lstlisting}
+select-inst-correct : $∀${p}{s}{v}
+  → interp-prog p s v
+  → interp-x86-var (select-inst p) s v
+\end{lstlisting}
+
+The correctness theorem delegates to the correctness lemma for
+\lstinline{select-stmt}, which says that if statement \lstinline{c}
+evaluates to \lstinline{v}, then the instructions generated for
+\lstinline{c} put the same value \lstinline{v} into \lstinline{rax}.
+The list of x86 instruction blocks is obtain by mapping
+\lstinline{select-stmt} over the control-flow graph \lstinline{G}.
+
+\begin{lstlisting}
+select-stmt-correct : $∀$ (c : CStmt) ($ρ$ $ρ′$ : Env Value)
+  (s s$′$ : Inputs)(regs : List Value)(v : Value)(G : CFG)
+  $→$ (s , $ρ$) , G $⊢ᶜ$ c $⇓$ v $⊣$ (s$′$ , $ρ′$)
+  $→$ 0 < length regs
+  $→$ $∃$[ regs$′$ ] $∃$[ b ] (s , regs , $ρ$) , map select-stmt G
+         $⊩$ select-stmt c $⇓$ (s$′$ , regs$′$ , $ρ′$) , b
+    × nth regs$′$ rax $≡$ just v
+\end{lstlisting}
+
+When the statement is an assignment, the proof uses the following
+lemma. It states that if expression \lstinline{e} evaluates to
+\lstinline{v}, then the instructions generated for \lstinline{e} put
+\lstinline{v} into the specified destination. The predicate
+\lstinline{wrote} specifies the update to either the appropriate
+variable or register depending on the kind of destination.
+
+\begin{lstlisting}
+select-assign-correct : $∀$ (e : CExp) ($ρ$ : Env Value)
+   (s s$′$ : Inputs) (dest : Dest) (regs : List Value)
+   (v : Value) (B : List Block) 
+  $→$ interp-CExp e $ρ$ s $≡$ just (v , s$′$)
+  $→$ 0 < length regs
+  $→$ DestOK dest 1
+  $→$ $∃$[ st$′$ ] (s , regs , $ρ$) , B $⊩$
+            select-assign e dest $⇓$ st$′$ , true
+      × wrote dest v (s$′$ , regs , $ρ$) st$′$
+\end{lstlisting}
+
+\noindent The premise \lstinline{0 < length regs} ensures that we at
+least have one register (\lstinline{rax}). The premise
+\lstinline{DestOK dest 1} ensures that the destination is either a
+variable or the register (\lstinline{rax}).
+
+\subsection{The Compiler is Correct}
+
+The correctness theorem for the compiler composes the four correctness
+lemmas of the previous subsections.
+
+\begin{lstlisting}
+compile-correct : (e : Exp) (s : Inputs) (v : Value)
+  $→$ interp-LIf e s $≡$ just v
+  $→$ interp-x86-var (compile e) s v
+compile-correct e s v ie =
+   let i-rco = trans (rco-correct e s) ie in
+   let i-lift = lift-locals-correct (rco e) s v i-rco in
+   let i-exp = explicate-correct i-lift in
+   select-inst-correct i-exp
+\end{lstlisting}
 
 
+\section{Conclusion}
 
-%%
+This paper takes a step in adapting the literature on compiler
+correctness~\citep{Leroy:2006fe,Kumar:2014aa} to a university course
+based on the incremental and nanopass approach of \emph{Essentials of
+Compilation}~\citep{Siek:2023tr,Siek:2023ue}. We prove the correctness
+of a compiler for a source language with let binding, integer
+arithmetic, conditional expressions and Booleans, targeting an
+x86-flavored register transfer language. The process of developing
+mechanizing the proof in Agda encouraged a further split in the
+nanopasses, separating Explicate Control into two passes, one that
+lifts \lstinline{let} bindings and the second that compiles structured
+control-flow into \lstinline{goto}. In designing these compiler passes
+and proofs, it is enjoyable to trace the history of ideas going back
+to \citet{Aho:1986qf}, \citet{Dybvig:1990aa}, and Olivier Danvy's
+one-pass transformation into monadic normal form~\citep{Danvy:2003fk}.
+
+
 %% The next two lines define the bibliography style to be used, and
 %% the bibliography file.
 \bibliographystyle{ACM-Reference-Format}
@@ -1347,3 +1484,17 @@ explicate-pred-CFG : $∀${e}{c$₁$ c$₂$ c}{G$₁$ G$₂$}
 \endinput
 %%
 %% End of file `sample-sigplan.tex'.
+
+% LocalWords:  sigplan tex docstrip dtx bibtex TeXCount TC envir Siek
+% LocalWords:  displaymath Nanopasses authornote authornotemark Tobin
+% LocalWords:  rv Trovato al Agda nanopasses Olivier Danvy's ccs desc
+% LocalWords:  nanopass Ichiro Aho qf gotos datatypes PEYTONJONES fk
+% LocalWords:  Danvy arity Dybvig's Dybvig aa Chez Olivier's CompCert
+% LocalWords:  fe Coq RTLgen CminorSel CompCert's CakeML stackLang tr
+% LocalWords:  labLang Kumar ue Sarkar whac de Bruijn kx Eq Exp Num
+% LocalWords:  Bool Var Int Env interp exp LIf immediates Atm atm mon
+% LocalWords:  LMonIf IR AST Prog StateImp cmpq je jmp CExp CStmt CFG
+% LocalWords:  IfEq CProg prog Arg Reg Dest Inst MovQ SubQ CmpQ JmpEq
+% LocalWords:  ReadInt rax StateX EFLAGS var inst rco cmplx suc IL ie
+% LocalWords:  retB thenB pred GHC thn eval Agda's transl condexpr
+% LocalWords:  stmt arg dest regs DestOK trans

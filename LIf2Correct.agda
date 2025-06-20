@@ -17,5 +17,5 @@ compile-correct : (e : Exp) (s : Inputs) (v : Value)
 compile-correct e s v ie =
    let i-rco = trans (rco-correct e s) ie in
    let i-lift = lift-locals-correct (rco e) s v i-rco in
-   let i-exp = explicate-correct {lift-locals (rco e)}{s}{v} i-lift in
-   select-inst-correct (explicate (lift-locals (rco e))) s v i-exp
+   let i-exp = explicate-correct i-lift in
+   select-inst-correct i-exp
