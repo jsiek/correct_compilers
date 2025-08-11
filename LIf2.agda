@@ -4,7 +4,7 @@ open import Agda.Builtin.Unit
 open import Data.Nat using (ℕ; zero; suc; _≤ᵇ_; _<_; _+_; _≡ᵇ_)
 open import Data.Nat.Properties
 open import Data.Product hiding (map)
-open import Data.Integer using (ℤ; -_; _-_; 0ℤ)
+open import Data.Integer using (ℤ; -_; _-_; 0ℤ; 1ℤ)
 open import Data.List
 open import Data.Maybe hiding (map)
 open import Function.Base using (_∘_)
@@ -196,10 +196,25 @@ rco (Sub e₁ e₂)
    -- Let (rco e₁)
    --   (Let (shift-mon (rco e₂) 0)
    --     (Sub (Var 1) (Var 0)))
-rco (Eq e₁ e₂) =
-   Let (rco e₁)
-    (Let (shift-mon (rco e₂) zero)
-      (Eq (Var (suc (zero))) (Var zero)))
+rco (Eq e₁ e₂)
+    -- Complex version:
+    with rco e₁ | rco e₂
+... | m₁ | m₂
+    with atomic? m₁ | atomic? m₂
+... | yes (atomic a₁) | yes (atomic a₂) =
+      Eq a₁ a₂
+... | no cmplx₁ | yes (atomic a₂) =
+      Let (rco e₁) (Eq (Var zero) (shift-atm a₂ 0))
+... | yes (atomic a₁) | no cmplx₂ =
+      Let (rco e₂) (Eq (shift-atm a₁ 0) (Var 0))
+... | no cmplx₁ | no cmplx₂ = 
+      Let m₁
+        (Let (shift-mon m₂ 0)
+          (Eq (Var 1) (Var 0)))
+   -- Simple version:
+   -- Let (rco e₁)
+   --  (Let (shift-mon (rco e₂) zero)
+   --    (Eq (Var (suc (zero))) (Var zero)))
 rco (Var i) = Atom (Var i)
 rco (Let e₁ e₂) = Let (rco e₁) (rco e₂)
 rco (If e₁ e₂ e₃) = If (rco e₁) (rco e₂) (rco e₃)
@@ -577,4 +592,155 @@ select-inst (Program n l B) =
 compile : Exp → X86Var
 compile e = (select-inst ∘ explicate ∘ lift-locals ∘ rco) e
 
-  
+----------------- Example ----------------------------
+
+{-
+let x = read in
+let y = read in
+if (if x == 0
+    then true
+    else read == 1)
+then y - 1
+else (y - 2) - x
+
+Execution:
+x := 5
+y := 10
+x == 0? false
+(4 - x) == 1? false
+  (y - 2) - x
+= 8 - x
+= 3
+-}
+
+P : Exp
+P = (Let Read
+      (Let Read
+        (If (If (Eq (Var 1) (Num 0ℤ)) (Bool true) (Eq Read (Num 1ℤ)))
+            (Sub (Var 0) (Num 1ℤ))
+            (Sub (Sub (Var 0) (Num (ℤ.pos 2))) (Var 1)))))
+
+V : Maybe Value
+V = interp-LIf P (0 , (λ{ 0 → ℤ.pos 5; 1 → ℤ.pos 10; 2 → 0ℤ; n → 0ℤ}))
+
+_ : V ≡ just (Int (ℤ.pos 3))
+_ = refl
+
+P1 : Mon
+P1 = rco P
+
+_ : P1 ≡ Let Read
+            (Let Read
+             (If
+              (If (Eq (Var 1) (Num (ℤ.pos 0))) (Atom (Bool true))
+               (Let Read (Eq (Var 0) (Num (ℤ.pos 1)))))
+              (Sub (Var 0) (Num (ℤ.pos 1)))
+              (Let (Sub (Var 0) (Num (ℤ.pos 2))) (Sub (Var 0) (Var 2)))))
+_ = refl
+
+{-
+
+let x = read in
+let y = read in
+if (if x == 0
+    then true
+    else (let t1 = read in t1 == 1))
+then (y - 1)
+else (let t2 = y - 2 in t2 - x)
+
+-}
+
+P2 : Imp-Prog
+P2 = lift-locals P1
+
+_ : P2 ≡ Program 4
+            (Assign 3 Read
+             (Assign 2 Read
+              (If
+               (If (Eq (Var 3) (Num (ℤ.pos 0))) (Atom (Bool true))
+                (Assign 1 Read (Eq (Var 1) (Num (ℤ.pos 1)))))
+               (Sub (Var 2) (Num (ℤ.pos 1)))
+               (Assign 0 (Sub (Var 2) (Num (ℤ.pos 2))) (Sub (Var 0) (Var 3))))))
+_ = refl
+
+{-
+var x, y, t1, t2;
+x := read;
+y := read;
+if (if x == 0
+    then true
+    else (t1 := read; t1 == 1)
+then (y - 1)
+else (t2 := y - 2; t2 - x)
+
+-}
+
+P3 : CProg
+P3 = explicate P2
+
+_ : P3 ≡ Program 4 6
+            (Return (Sub (Var 2) (Num (ℤ.pos 1))) ∷
+             Assign 0 (Sub (Var 2) (Num (ℤ.pos 2)))
+             (Return (Sub (Var 0) (Var 3)))
+             ∷
+             Goto 0 ∷
+             Goto 1 ∷
+             Goto 0 ∷
+             Assign 1 Read (IfEq (Var 1) (Num (ℤ.pos 1)) 2 3) ∷
+             Assign 3 Read (Assign 2 Read (IfEq (Var 3) (Num (ℤ.pos 0)) 4 5)) ∷
+             [])
+_ = refl
+
+{-
+var x, y, t1, t2;
+block_0:
+   x := read;
+   y := read;
+   if (x == 0) goto block_1; else goto block_3;
+block_1:
+    goto block_2;
+block_2:
+    return y - 1;
+block_3:
+   t1 := read;
+   if (t1 == 1) goto block_4; else goto block_5;
+block_4:
+    goto block_2;
+block_5:
+    goto block_6;
+block_6:
+    t2 := y - 2;
+    return t2 - x;
+ -}
+
+P4 : X86Var
+P4 = select-inst P3
+
+_ : P4 ≡ Program 4 6
+            ((MovQ (Var 2) (Reg 0) ∷
+              SubQ (Num (ℤ.pos 1)) (Reg 0) ∷ MovQ (Reg 0) (Reg 0) ∷ [])
+             ∷
+             (MovQ (Var 2) (Reg 0) ∷
+              SubQ (Num (ℤ.pos 2)) (Reg 0) ∷
+              MovQ (Reg 0) (Var 0) ∷
+              MovQ (Var 0) (Reg 0) ∷
+              SubQ (Var 3) (Reg 0) ∷ MovQ (Reg 0) (Reg 0) ∷ [])
+             ∷
+             (Jmp 0 ∷ []) ∷
+             (Jmp 1 ∷ []) ∷
+             (Jmp 0 ∷ []) ∷
+             (ReadInt ∷
+              MovQ (Reg 0) (Var 1) ∷
+              CmpQ (Var 1) (Num (ℤ.pos 1)) ∷ JmpEq 2 ∷ Jmp 3 ∷ [])
+             ∷
+             (ReadInt ∷
+              MovQ (Reg 0) (Var 3) ∷
+              ReadInt ∷
+              MovQ (Reg 0) (Var 2) ∷
+              CmpQ (Var 3) (Num (ℤ.pos 0)) ∷ JmpEq 4 ∷ Jmp 5 ∷ [])
+             ∷ [])
+_ = refl 
+{-
+
+
+ -}

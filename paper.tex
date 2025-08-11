@@ -139,7 +139,7 @@ basicstyle=\ttfamily\small,
 keywordstyle=\ttfamily\small,
 %morekeywords={match,case,bool,int,let,begin,if,else,closure},
 %deletekeywords={locals},
-%escapechar=|,
+escapechar=|,
 mathescape=true,
 columns=flexible,
 %moredelim=[is][\color{red}]{~}{~},
@@ -333,12 +333,19 @@ the Explicate Control pass of the compiler uses the one-function per
 context approach of Danvy to translate into an x86-flavored register
 transfer language.  \emph{Essentials of Compilation} also employs the
 nanopass approach, breaking up the compiler into many small passes
-that are easier for student to digest~\citep{Sarkar:2004fk}.
+that are easier for student to digest~\citep{Sarkar:2004fk}.  There
+are many other pedogogical treatments of
+compilation~\citep{Appel:2003fk,Sumii:2005aa,Aho:2006wb,Cooper:2011aa,Grune:2012aa};
+what makes the \emph{Essentials of Compilation} unique is that it is
+the first textbook to apply the incremental approach.  However,
+\emph{Essentials of Compilation} does not include material about the
+formal verification of compilers; hence my present interest.
 
 This paper presents a proof of correctness in Agda for four nanopasses
 that translate a source language with let binding, integer arithmetic,
 conditional expressions and Booleans into an x86-flavored register
-transfer language. These four passes correspond to the
+transfer language. The Agda code is available in the supplementary
+material. The four compiler passes presented here correspond to the
 following three passes in \emph{Essentials of Compilation}:
 \begin{enumerate}
 \item Remove Complex Operands
@@ -363,6 +370,10 @@ keeps the name Explicate Control.
 \item Explicate Control
 \item Select Instructions
 \end{enumerate}
+In compilers that do not take the nanopass approach, unrelated
+responsibilities are sometimes combined into the same pass.  For
+example, \citet{Sumii:2005aa} combines the first three of the above
+passes into a single pass.
 
 Section~\ref{sec:langs} of the paper introduces the intermediate
 languages. Section~\ref{sec:compiler} describes the compiler,
@@ -382,27 +393,26 @@ of the source language and four intermediate languages in Agda:
 \end{enumerate}
 These languages and their semantics are quite standard. However, there
 are many other intermediate languages in the literature to choose
-from, so why these languages, and why in this particular order?  The
-answer is that they happen to represent the images of the four
-nanopasses.  So then the question becomes, why do we choose to order
-the nanopasses in this way? The main thing to consider is that some
-passes make later passes easier because they remove a language feature
-that would have been complicated to handle. For example, the Lift
-Locals pass removes \texttt{let}, and I found \texttt{let} difficult
-to deal with in the proof of correctness for Explicate Control
-(\texttt{let} is relatively easy to handle in the code for Explicate
-Control). The other thing to consider is that some compiler passes use
-certain language features in their generated code, so the passes that
-remove those language features better come later in the ordering.  For
-example, the Closure Conversion pass (not discussed here) generates
-code with \texttt{let}, so Closure Conversion comes before Lift
-Locals.
+from~\citep{Flanagan:1993cg,Hatcliff:1994vn,Kelsey:1995uq,Birkedal:1996aa},
+so why these languages, and why in this particular order?  The answer
+is that they happen to represent the images of the four nanopasses.
+So then the next question is: why do we order the nanopasses in this
+way? The main thing to consider is that some passes make later passes
+easier because they remove a language feature that would have been
+complicated to handle. For example, the Lift Locals pass removes
+\texttt{let}, and I found \texttt{let} difficult to deal with in the
+proof of correctness for Explicate Control (\texttt{let} is relatively
+easy to handle in the code for Explicate Control). The other thing to
+consider is that some compiler passes use certain language features in
+their generated code, so the passes that remove those language
+features better come later in the ordering.  For example, the Closure
+Conversion pass (not discussed here) generates code with \texttt{let},
+so Closure Conversion comes before Lift Locals. Finally, many design
+choices in \emph{Essentials of Compilation} have been inherited from
+\citet{Dybvig:2010aa}
 
 One of the perennial challenges of formalizing semantics in a proof
 assistant is that one needs to choose a representation of variables.
-%% There are many
-%% options, and I've tried most of them. But just like a game of
-%% whac-a-mole, the savings achieved in one place are lost in others.
 Of the many options, my current favorite is good old de Bruijn
 indices~\citep{Bruijn:1972kx}.  Thus, identifiers \lstinline{Id} are
 represented as natural numbers.
@@ -748,19 +758,64 @@ We now proceed to discuss the compiler and its proof of correctness.
 The compiler is simply the composition of the four passes,
 which we detail in the next four subsections.
 
-\begin{lstlisting}
-compile e = (select-inst ∘ explicate ∘ lift-locals ∘ rco) e
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
+compile e = (select-inst $∘$ explicate $∘$ lift-locals $∘$ rco) e
 \end{lstlisting}
 
+To illustrate each pass, we use the source program in
+figure~\ref{fig:running-example-source} as a running example,
+presented in a concrete syntax with variables as names instead of de
+Bruijn indices to enhance readability.  Given the inputs
+\lstinline{5}, \lstinline{10}, then \lstinline{0}, the result of this
+program is \lstinline{3}.
+
+\begin{figure}[tp]
+  \hrule
+\begin{lstlisting}
+    let x = read in
+    let y = read in
+    if (if x == 0
+        then true
+        else read == 1)
+    then y - 1
+    else (y - 2) - x
+\end{lstlisting}
+  \hrule
+\caption{An example source program.}
+\label{fig:running-example-source}
+\end{figure}
 
 \subsection{Pass: Remove Complex Operands}
 
-We implement the Remove Complex Operands pass with the following
-\lstinline{rco} function in Agda. This pass is responsible for making
-sure that the arguments of primitive operations, such as
-\lstinline{Sub} and \lstinline{Eq}, are atomic expression (variables
-or literals).
+The Remove Complex Operands pass is responsible for making sure that
+the arguments of primitive operations, such as \lstinline{Sub} and
+\lstinline{Eq}, are atomic expression (variables or literals). It does
+so by insertion \lstinline{let} bindings for new temporary variables.
+In the running example (figure~\ref{fig:running-example-monadic}), the
+subexpressions \lstinline{read} and \lstinline{y - 2} are both
+arguments of primitive operations, so the Remove Complex Operands pass
+binds them to the temporary variables \lstinline{t1} and
+\lstinline{t2}, respectively.
 
+\begin{figure}[tp]
+  \hrule
+\begin{lstlisting}
+    let x = read in
+    let y = read in
+    if (if x == 0
+        then true
+        else (let t1 = read in t1 == 1))
+    then (y - 1)
+    else (let t2 = y - 2 in t2 - x)
+\end{lstlisting}
+  \hrule
+\caption{Example after Remove Complex Operands, in
+  monadic normal form.}
+\label{fig:running-example-monadic}
+\end{figure}
+
+We implement the Remove Complex Operands pass with the following
+\lstinline{rco} function in Agda.
 \begin{lstlisting}
 rco : Exp $→$ Mon
 \end{lstlisting}
@@ -769,7 +824,7 @@ Most of the cases of \lstinline{rco} are trivial, but let us focus on
 the case for subtraction. We shall start with a straw-man
 translation. We recursively compile the subexpressions $e_1$ and
 $e_2$. The results might be complex (not atomic), so we
-\lstinline{let} binding them both and replace them in the subtraction
+\lstinline{let}-bind them both and replace them in the subtraction
 with variables (de Bruijn indices 0 and 1). Note that we must shift
 the variables in $e_2$ up by one because we inserted a new
 \lstinline{let} above $e_2$. (In general, \lstinline{shift-mon m c}
@@ -838,7 +893,7 @@ shifting the variable by one with the cutoff set to the
 the length of $ρ₁$ and looking it up in the environment
 ($ρ₁$ ++ v $∷$ $ρ₂$), for any value $v$.
 
-\begin{lstlisting}
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
 nth-++-shift-var : ($ρ₁$ $ρ₂$ : List A)(v : A)(x : Id)
   $→$ nth ($ρ₁$ ++ v $∷$ $ρ₂$) (shift-var x (length $ρ₁$))
     $≡$ nth ($ρ₁$ ++ $ρ₂$) x
@@ -855,11 +910,29 @@ interp-shift-mon : (m : Mon)(v : Value)($ρ₁$ $ρ₂$ : Env Value)
 
 \subsection{Pass: Lift Locals}
 
-The Lift Locals pass is responsible for replacing all of the
-\lstinline{let} expressions with assignment statements.  After this
-pass, variables are still represented by de Bruijn indices but they
-are all bound by the \lstinline{Program} AST node.
+The Lift Locals pass is responsible for replacing \lstinline{let}
+expressions with assignment statements. In the output language,
+variables are declared at the top of the program.  Here is the result
+of Lift Locals on the running example. The output of Lift Locals on
+the running example is shown in
+figure~\ref{fig:running-example-structured-imperative}.
 
+\begin{figure}[tp]
+  \hrule
+\begin{lstlisting}
+    var x, y, t1, t2;
+    x := read;
+    y := read;
+    if (if x == 0
+        then true
+        else (t1 := read; t1 == 1)
+    then (y - 1)
+    else (t2 := y - 2; t2 - x)
+\end{lstlisting}
+  \hrule
+  \caption{Example after Lift Locals, in an imperative IR.}
+  \label{fig:running-example-structured-imperative}
+\end{figure}
 The \lstinline{lift-locals} function delegates to the recursive
 function \lstinline{lift-locals-mon}, where all the work is done.
 That function returns a number $n$ that counts the number of
@@ -986,6 +1059,43 @@ comparison operator and the \lstinline{If} expressions that depend on
 them, thereby avoiding the needless extra code that would be generated
 by a naive approach.
 
+The output of Explicate Control on the running example is shown in
+figure~\ref{fig:running-example-goto}. Note that there are two
+\lstinline{goto} statements that target \lstinline{block_2}, so indeed
+the control-flow graph of this program is a directed acyclic graph
+(DAG) and not a tree. The DAG representation enables sharing so the
+pass can avoid the duplication of code. We discuss the trivial blocks
+4 and 5 at the end of this section.
+
+\begin{figure}[tp]
+  \hrule
+\begin{lstlisting}
+    var x, y, t1, t2;
+    block_0:
+       x := read;
+       y := read;
+       if (x == 0) goto block_1; else goto block_3;
+    block_1:
+        goto block_2;
+    block_2:
+        return y - 1;
+    block_3:
+       t1 := read;
+       if (t1 == 1) goto block_4; else goto block_5;
+    block_4:
+        goto block_2;
+    block_5:
+        goto block_6;
+    block_6:
+        t2 := y - 2;
+        return t2 - x;
+\end{lstlisting}
+  \hrule
+  \caption{Example after Explicate Control, with control flow
+    made explicit with goto.}
+\label{fig:running-example-goto}
+\end{figure}
+
 We implement the Explicate Control pass with four functions in Agda,
 the \lstinline{explicate} function translates a whole program from the
 imperative IR to the C-like language, but it delegates all the work to
@@ -1018,11 +1128,10 @@ _thenB_ : {A B : Set} $→$ Build A $→$ (A $→$ Build B)
 add-node : CStmt $→$ Build Id
 \end{lstlisting}
 
-\noindent Here are the signatures of the four functions that make up
-the Explicate Control pass. Next we discuss select cases of these
-functions.
+\noindent The following four functions make up the Explicate Control
+pass. Next we discuss select cases of these functions.
 
-\begin{lstlisting}
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
 explicate : Imp-Prog $→$ CProg
 explicate-tail : Imp-Exp $→$ Build CStmt
 explicate-assign : Id $→$ Imp-Exp $→$ CStmt $→$ Build CStmt
@@ -1162,11 +1271,12 @@ duplication. However, some further care is needed to avoid adding (1)
 trivial nodes that only contain a \lstinline{Goto} and (2) nodes that
 are never the target of a jump (i.e., dead code). The
 \lstinline{add-node} function can easily handle (1) by inspecting its
-argument and if it is a \lstinline{Goto}, just return its label
-instead of adding a new node to the CFG.  Avoiding dead code (2) is
-more challenging, either requiring a post-processing of the CFG or use
-lazy evaluation to delay the addition of nodes to the CFG to the point
-where they are definitely needed~\citep{Siek:2023tr}.
+argument and, if it is a \lstinline{Goto}, return its label instead of
+adding a new node to the CFG. This optimization is known as
+compressing corridor transitions~\citep{Danvy:2009aa}.  Avoiding dead
+code (2) is more challenging, either post-process the CFG or use lazy
+evaluation to delay the addition of nodes to the CFG to the time when
+they are definitely needed~\citep{Siek:2023tr}.
 
 \subsubsection{Explicate Control is Correct}
 
@@ -1224,9 +1334,9 @@ explicate-tail-CFG : $∀${e}{G$₁$ G$₂$}{c}
 respect to the $↝$ relation on control flow graphs.
 \begin{lstlisting}
 eval-CFG : $∀${c}{$ρ$ $ρ′$}{B$₁$ B$₂$}{s s$′$}{v}
-  → B$₁$ $↝$ B$₂$
-  → (s , $ρ$) , B$₁$ $⊢ᶜ$ c $⇓$ v $⊣$ (s$′$ , $ρ′$)
-  → (s , $ρ$) , B$₂$ $⊢ᶜ$ c $⇓$ v $⊣$ (s$′$ , $ρ′$)
+  $→$ B$₁$ $↝$ B$₂$
+  $→$ (s , $ρ$) , B$₁$ $⊢ᶜ$ c $⇓$ v $⊣$ (s$′$ , $ρ′$)
+  $→$ (s , $ρ$) , B$₂$ $⊢ᶜ$ c $⇓$ v $⊣$ (s$′$ , $ρ′$)
 \end{lstlisting}
 
 
@@ -1247,13 +1357,13 @@ explicate-assign-correct :
 
 \noindent The case for conditional expressions needs another lemma
 regarding control flow graphs. Similar to \lstinline{explicate-tail},
-we need a lemma which states that the output CFG of
-\lstinline{explicate-assign} is an extension of its input CFG.
+we need a lemma which states that the output CFG is an extension of
+its input CFG.
 
 \begin{lstlisting}
 explicate-assign-CFG : $∀${x}{m}{c c'}{G$₁$ G$₂$}
-  → explicate-assign x m c G$₁$ $≡$ (c' , G$₂$)
-  → G$₁$ $↝$ G$₂$
+  $→$ explicate-assign x m c G$₁$ $≡$ (c' , G$₂$)
+  $→$ G$₁$ $↝$ G$₂$
 \end{lstlisting}
 
 \paragraph{Explicate Predicate is Correct}
@@ -1294,7 +1404,53 @@ The responsibility of the Select Instructions pass is to convert the
 assignment statements and primitive operations of the C-like language
 into x86 instructions. The minor challenge is that many x86
 instructions take just two arguments and have an update-in-place
-semantics.
+semantics. The output of Select Instructions on the running example is
+shown in figure~\ref{fig:running-example-x86}.\footnote{The redundant
+\texttt{movq} instructions are removed by the Patch Instructions pass
+in \emph{Essentials of Compilation}, which comes after Select
+Instructions and Register Allocation.}
+
+\begin{figure}[tp]
+  \hrule
+\begin{lstlisting}[mathescape=false]
+    var x, y, t1, t2
+    block_0:
+       callq read_int
+       movq %rax, x
+       callq read_int
+       movq %rax, y
+       cmpq x, $0
+       je block_1
+       jmp block_3
+    block_1:
+        jmp block_2
+    block_2:
+        movq y, %rax
+        subq $1, %rax
+        movq %rax, %rax
+    block_3:
+        callq read_int
+        movq %rax, t1
+        cmpq t1, $1
+        je block_4
+        jmp block_5
+    block_4:
+        jmp block_2
+    block_5:
+        jmp block_6
+    block_6:
+        movq y, %rax
+        subq $2, %rax
+        movq %rax, t2
+        movq t2, %rax
+        subq x, %rax
+        movq %rax, %rax
+\end{lstlisting}
+  \hrule
+  \caption{Example after Select Instructions, in the x86 assembly language
+    augmented with variables.}
+\label{fig:running-example-x86}
+\end{figure}
 
 The function \lstinline{select-inst} translation a whole program in
 the C-like language to x86.
@@ -1328,15 +1484,15 @@ is translated to a \lstinline{CmpQ} instruction followed
 by \lstinline{JmpEq} and an unconditional \lstinline{Jmp}.
 
 \begin{lstlisting}
-select-stmt (IfEq a₁ a₂ thn els) =
-  CmpQ (to-arg a₁) (to-arg a₂) ∷
-  JmpEq thn ∷
-  Jmp els ∷ []
+select-stmt (IfEq a$_1$ a$_2$ thn els) =
+  CmpQ (to-arg a$_1$) (to-arg a$_2$) $∷$
+  JmpEq thn $∷$
+  Jmp els $∷$ []
 \end{lstlisting}
 
 \noindent Finally, we translate \lstinline{Goto} into a \lstinline{Jmp}.
 \begin{lstlisting}
-select-stmt (Goto l) = Jmp l ∷ [] 
+select-stmt (Goto l) = Jmp l $∷$ [] 
 \end{lstlisting}
 
 Next we look at some representative cases of
@@ -1389,8 +1545,8 @@ program that outputs the same value given the same input.
 
 \begin{lstlisting}
 select-inst-correct : $∀${p}{s}{v}
-  → interp-prog p s v
-  → interp-x86-var (select-inst p) s v
+  $→$ interp-prog p s v
+  $→$ interp-x86-var (select-inst p) s v
 \end{lstlisting}
 
 The correctness theorem delegates to the correctness lemma for
