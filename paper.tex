@@ -298,7 +298,7 @@ by \citet{Lawall:1994aa} on continuation-based partial
 evaluation. Indeed, the above is a partial evaluation of Boolean
 expressions.
 
-My first exposure to these ideas were in Kent Dybvig's compiler
+My first exposure to these ideas was in Kent Dybvig's compiler
 course~\citep{Dybvig:2010aa} where he taught the techniques used in
 the Chez Scheme compiler~\citep{Dybvig:2006aa}.  One of those
 techniques is called destination-driven code
@@ -318,11 +318,11 @@ function on a disjoint union.
 \]
 
 The CompCert compiler \citep{Leroy:2006fe} (a compiler for C verified
-in Coq) uses the one-function per context approach of Danvy in the
+in Rocq) uses the one-function per context approach of Danvy in the
 RTLgen pass that translates from the CminorSel intermediate language
 to CompCert's register transfer language. The verified CakeML
 compiler, on the other hand, employs a naive translation of Boolean
-expressions and conditionals for the compilation of stackLang the
+expressions and conditionals for the compilation of the stackLang 
 intermediate language into labLang~\citep{Kumar:2014aa}.
 
 Towards developing a course on verified compilation, I am interested
@@ -349,14 +349,20 @@ This paper presents a proof of correctness in Agda for four nanopasses
 that translate a source language with let binding, integer arithmetic,
 conditional expressions and Booleans into an x86-flavored register
 transfer language. The Agda code is available in the supplementary
-material. The four compiler passes presented here correspond to the
+material. It does not depend on particular features of Agda and could
+have been carried out in Rocq, Isabelle, or Lean.\footnote{The choice
+of Agda for this paper is not an endorsement of Agda but is a
+byproduct of the author's relative expertise in Agda at the time of
+writing.}
+
+The four compiler passes presented here correspond to the
 following three passes in \emph{Essentials of Compilation}:
 \begin{enumerate}
 \item Remove Complex Operands
 \item Explicate Control
 \item Select Instructions
 \end{enumerate}
-The process of proving of correctness of the Explicate Control pass
+The process of proving correctness of the Explicate Control pass
 made it clear to me that it has two distinct responsibilities that
 deserve to be separated:
 \begin{itemize}
@@ -428,11 +434,11 @@ Id = $ℕ$
 \subsection{The Source Language}
 
 The source language includes integers, Booleans, \texttt{Let} binding,
-and conditional expressions. We choose a couple representative
-primitive operators: \texttt{Sub} for integer subtraction and
-\texttt{Eq} for equality on integers and Booleans.\footnote{Adding
-more primitive operators is straightforward but uninteresting.}  The
-\texttt{Read} operation requests an integer input from the user of the
+and conditional expressions. We choose two representative primitive
+operators: \texttt{Sub} for integer subtraction and \texttt{Eq} for
+equality on integers and Booleans.\footnote{Adding more primitive
+operators is straightforward but uninteresting.}  The \texttt{Read}
+operation requests an integer input from the user of the
 program.\footnote{\texttt{Read} is necessary to prevent students from
 interpreting the programs instead of compiling them.}
 
@@ -750,7 +756,7 @@ unusual, so here are the three rules.
 
 The meaning of a whole program is given by the following relation.
 \begin{lstlisting}
-interp-x86-var : X86Var → Inputs → Value → Set
+interp-x86-var : X86Var $→$ Inputs $→$ Value $→$ Set
 \end{lstlisting}
     
 We now proceed to discuss the compiler and its proof of correctness.
@@ -885,8 +891,8 @@ The main lemma is that \lstinline{rco} followed by
 \lstinline{interp-mon} is equivalent to \lstinline{interp-exp}.
 
 \begin{lstlisting}
-rco-correct-exp : ∀ (e : Exp) (ρ : Env Value)
-  → interp-mon (rco e) ρ ≡ interp-exp e ρ
+rco-correct-exp : $∀$ (e : Exp) ($ρ$ : Env Value)
+  $→$ interp-mon (rco e) $ρ$ $≡$ interp-exp e $ρ$
 \end{lstlisting}
 
 The proof is by structural induction on $e$, but it requires the
@@ -944,7 +950,7 @@ That function returns a number $n$ that counts the number of
 expression.
 
 \begin{lstlisting}
-lift-locals : Mon → Imp-Prog
+lift-locals : Mon $→$ Imp-Prog
 lift-locals m
     with lift-locals-mon m
 ... | n , e = Program n e    
@@ -1040,11 +1046,11 @@ that generalize our previous ones to arbitrary amounts of shifting.
 
 \begin{lstlisting}
 $⇓$shifts : $∀${e}{v}{s $s′$}{$ρ₁$ $ρ′₁$ $ρ₂$ $ρ₃$ $ρ′₃$} 
-  $→$ (s , $ρ₁$++$ρ₃$) $⊢$ e $⇓$ v $⊣$ ($s′$ , $ρ′₁$++$ρ′₃$)
+  $→$ (s , $ρ₁$ ++ $ρ₃$) $⊢$ e $⇓$ v $⊣$ ($s′$ , $ρ′₁$ ++ $ρ′₃$)
   $→$ length $ρ′₁$ $≡$ length $ρ₁$
-  $→$ (s , $ρ₁$++$ρ₂$++$ρ₃$) $⊢$
-       shifts-imp-exp e (length $ρ₁$) (length $ρ₂$)
-       $⇓$ v $⊣$ ($s′$ , $ρ′₁$++$ρ₂$++$ρ′₃$)
+  $→$ (s , $ρ₁$ ++ $ρ₂$ ++ $ρ₃$)
+      $⊢$ shifts-imp-exp e (length $ρ₁$) (length $ρ₂$)
+      $⇓$ v $⊣$ ($s′$ , $ρ′₁$ ++ $ρ₂$ ++ $ρ′₃$)
 \end{lstlisting}
 
 
@@ -1122,7 +1128,7 @@ continuation parameter.
 
 All three functions will be building a control flow graph, which needs
 to be threaded into and out of these functions, so they use the
-following a \lstinline{Build} monad:
+following \lstinline{Build} monad:
 
 \begin{lstlisting}
 Build A = CFG $→$ A × CFG
@@ -1557,10 +1563,10 @@ The correctness theorem delegates to the correctness lemma for
 \lstinline{select-stmt}, which says that if statement \lstinline{c}
 evaluates to \lstinline{v}, then the instructions generated for
 \lstinline{c} put the same value \lstinline{v} into \lstinline{rax}.
-The list of x86 instruction blocks is obtain by mapping
+The list of x86 instruction blocks is obtained by mapping
 \lstinline{select-stmt} over the control-flow graph \lstinline{G}.
 
-\begin{lstlisting}
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
 select-stmt-correct : $∀$ (c : CStmt) ($ρ$ $ρ′$ : Env Value)
   (s s$′$ : Inputs)(regs : List Value)(v : Value)(G : CFG)
   $→$ (s , $ρ$) , G $⊢ᶜ$ c $⇓$ v $⊣$ (s$′$ , $ρ′$)
@@ -1650,7 +1656,7 @@ one-pass transformation into monadic normal form~\citep{Danvy:2003fk}.
 % LocalWords:  rv Trovato al Agda nanopasses Olivier Danvy's ccs desc
 % LocalWords:  nanopass Ichiro Aho qf gotos datatypes PEYTONJONES fk
 % LocalWords:  Danvy arity Dybvig's Dybvig aa Chez Olivier's CompCert
-% LocalWords:  fe Coq RTLgen CminorSel CompCert's CakeML stackLang tr
+% LocalWords:  fe Rocq RTLgen CminorSel CompCert's CakeML stackLang tr
 % LocalWords:  labLang Kumar ue Sarkar whac de Bruijn kx Eq Exp Num
 % LocalWords:  Bool Var Int Env interp exp LIf immediates Atm atm mon
 % LocalWords:  LMonIf IR AST Prog StateImp cmpq je jmp CExp CStmt CFG
