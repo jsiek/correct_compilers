@@ -560,7 +560,7 @@ transformation.)
 The third language replaces the \lstinline{Let} bindings with
 assignment expressions but retains the structured control-flow and
 expression-oriented nature of the language. This language brings us
-closer to x86 because variables are represented by registers and stack
+closer to x86 where variables are replaced by registers and stack
 locations, all of which are mutable. The abstract syntax for
 assignment is \lstinline{(Assign $x$ $e_1$ $e_2$)} where $e_1$ is the
 right-hand side and $e_2$ is an expression to be executed after the
@@ -617,7 +617,7 @@ instructions: \lstinline{cmpq}, \lstinline{je}, and \lstinline{jmp}.
 However, compiling from the previous IR to this one is non-trivial
 because the previous IR allowed arbitrarily nested expressions to
 appear in the condition of an \lstinline{if}, including other
-\lstinline{if}'s!
+\lstinline{if}s!
 
 \begin{lstlisting}
 data CExp : Set where
@@ -647,7 +647,7 @@ and jump labels are indexes into that list.  So \lstinline{Program}
 consists of (1) the number of variables, (2) the index of the start
 node, (3) the control flow graph.
 
-We choose a big-step semantics for C-like language because the
+We choose a big-step semantics for the C-like language because the
 semantics is no longer structurally recursive and furthermore,
 programs are no longer guaranteed to terminate.\footnote{The programs
 in the image of Explicate Control are guaranteed to terminate, but
@@ -686,10 +686,10 @@ interp-prog : CProg $→$ Inputs $→$ Value $→$ Set
 \subsection{x86 with variables}
 
 The final intermediate language is a subset of x86 assembly language,
-except for the addition of variables. A complete compiler would
-include a few more passes to perform register allocation and deal with
-idiosyncrasies of x86, such as only allowing at most one instruction
-argument to access memory.
+except for the addition of variables. The compiler in \emph{Essentials
+of Compilation} includes a few more passes to perform register
+allocation and deal with the idiosyncrasies of x86, such as only
+allowing at most one instruction argument to access memory.
 
 \begin{lstlisting}
 data Arg : Set where
@@ -727,7 +727,7 @@ StateX86 = Inputs × List Value × List Value
 
 The meaning of each instruction is given by the following relation.
 The Boolean in this relation specifies whether the instruction
-falls-through to the next instruction or not (because it jumped).
+falls through to the next instruction or not (because it jumped).
 
 \begin{lstlisting}
 data _,_$⊢$_$⇓$_,_ : StateX86 $→$ List Block $→$ Inst
@@ -741,39 +741,36 @@ instead of the special \lstinline{EFLAGS} register. Likewise,
 \lstinline{JmpEq} does not check the \lstinline{EFLAGS} register, but
 instead jumps if \lstinline{rax} contains \lstinline{true}.
 
-\noindent The meaning of a sequence of instructions is given the
+The meaning of a sequence of instructions is given the
 following big-step relation.
 
 \begin{lstlisting}
 data _,_$⊩$_$⇓$_,_ : StateX86 $→$ List Block $→$ List Inst
                      $→$ StateX86 $→$ $𝔹$ $→$ Set 
 \end{lstlisting}
-
-This big-step treatment of the semantics of instruction sequences is
-unusual, so here are the three rules.
-
+This big-step treatment of instruction sequences is unusual, so here
+are the three rules.
 \begin{gather*}
 \inferrule{}{s , B ⊩ [] ⇓ s , \mathsf{true}} \\[1ex]
 \inferrule{s , B ⊢ i ⇓ s′ , \mathsf{true} \\
            s′ , B ⊩ is ⇓ s″ , b}
           {s , B ⊩ i ∷ is ⇓ s′ , b}\\[1ex]
 \inferrule{s , B ⊢ i ⇓ s′ , \mathsf{false}}
-          {s , B ⊩ i ∷ is ⇓ s′ , b}
+          {s , B ⊩ i ∷ is ⇓ s′ , \mathsf{false}}
 \end{gather*}
-
-The meaning of a whole program is given by the following relation.
+The meaning of a program is given by the following relation.
 \begin{lstlisting}
 interp-x86-var : X86Var $→$ Inputs $→$ Value $→$ Set
 \end{lstlisting}
     
-We now proceed to discuss the compiler and its proof of correctness.
+Next we discuss the compiler and its proof of correctness.
 
 
 \section{The Compiler}
 \label{sec:compiler}
 
-The compiler is simply the composition of the four passes,
-which we detail in the next four subsections.
+The compiler is the composition of the four passes, which we detail in
+the next four subsections.
 
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
 compile e = (select-inst $∘$ explicate $∘$ lift-locals $∘$ rco) e
@@ -807,9 +804,9 @@ program is \lstinline{3}.
 The Remove Complex Operands pass is responsible for making sure that
 the arguments of primitive operations, such as \lstinline{Sub} and
 \lstinline{Eq}, are atomic expression (variables or literals). It does
-so by insertion \lstinline{let} bindings for new temporary variables.
+so by inserting \lstinline{let} bindings for new temporary variables.
 In the running example (figure~\ref{fig:running-example-monadic}), the
-subexpressions \lstinline{read} and \lstinline{y - 2} are both
+subexpressions \lstinline{read} and \lstinline{(y - 2)} are both
 arguments of primitive operations, so the Remove Complex Operands pass
 binds them to the temporary variables \lstinline{t1} and
 \lstinline{t2}, respectively.
@@ -826,8 +823,7 @@ binds them to the temporary variables \lstinline{t1} and
     else (let t2 = y - 2 in t2 - x)
 \end{lstlisting}
   \hrule
-\caption{Example after Remove Complex Operands, in
-  monadic normal form.}
+\caption{\small Result of Remove Complex Operands on the example.}
 \label{fig:running-example-monadic}
 \end{figure}
 
@@ -864,16 +860,16 @@ and \lstinline{rco e$₂$} are atomic.
 
 \begin{lstlisting}
 rco (Sub e$₁$ e$₂$)
-    with rco e$₁$ | rco e$₂$
-... | m$₁$ | m$₂$
-    with atomic? m$₁$ | atomic? m$₂$
-... | yes (atomic a$₁$) | yes (atomic a$₂$) =
+    with rco e$₁$ $|$ rco e$₂$
+... $|$ m$₁$ $|$ m$₂$
+    with atomic? m$₁$ $|$ atomic? m$₂$
+... $|$ yes (atomic a$₁$) $|$ yes (atomic a$₂$) =
       Sub a$₁$ a$₂$
-... | no cmplx$₁$ | yes (atomic a$₂$) =
+... $|$ no cmplx$₁$ $|$ yes (atomic a$₂$) =
       Let (rco e$₁$) (Sub (Var zero) (shift-atm a$₂$ 0))
-... | yes (atomic a$₁$) | no cmplx$₂$ =
+... $|$ yes (atomic a$₁$) $|$ no cmplx$₂$ =
       Let (rco e$₂$) (Sub (shift-atm a$₁$ 0) (Var 0))
-... | no cmplx$₁$ | no cmplx$₂$ = 
+... $|$ no cmplx$₁$ $|$ no cmplx$₂$ = 
       Let m$₁$
         (Let (shift-mon m$₂$ 0)
           (Sub (Var 1) (Var 0)))
@@ -929,9 +925,8 @@ interp-shift-mon : (m : Mon)(v : Value)($ρ₁$ $ρ₂$ : Env Value)
 
 The Lift Locals pass is responsible for replacing \lstinline{let}
 expressions with assignment statements. In the output language,
-variables are declared at the top of the program.  Here is the result
-of Lift Locals on the running example. The output of Lift Locals on
-the running example is shown in
+variables are declared at the top of the program.  The result of Lift
+Locals on the running example is shown in
 figure~\ref{fig:running-example-structured-imperative}.
 
 \begin{figure}[tp]
@@ -947,37 +942,35 @@ figure~\ref{fig:running-example-structured-imperative}.
     else (t2 := y - 2; t2 - x)
 \end{lstlisting}
   \hrule
-  \caption{Example after Lift Locals, in an imperative IR.}
+  \caption{Result of Lift Locals on the example.}
   \label{fig:running-example-structured-imperative}
 \end{figure}
 The \lstinline{lift-locals} function delegates to the recursive
 function \lstinline{lift-locals-mon}, where all the work is done.
-That function returns a number $n$ that counts the number of
-\lstinline{let} bindings in the expression, and the translated
-expression.
+That function returns (1) a number $n$ that counts the number of
+\lstinline{let} bindings that were in the expression and (2) the
+translation of the expression.
 
 \begin{lstlisting}
 lift-locals : Mon $→$ Imp-Prog
 lift-locals m
     with lift-locals-mon m
-... | n , e = Program n e    
+... $|$ n , e = Program n e    
 \end{lstlisting}
 
-\noindent The case of \lstinline{lift-locals-mon} for \lstinline{Let}
-is the most interesting. One can imagine that the result of
-\lstinline{lift-locals-mon m$₁$} is a sequence of $i$ imaginary
-\lstinline{let}'s surrounding \lstinline{e$₁$}. Similarly for 
-\lstinline{lift-locals-mon m$₁$}.
-The translation result for this \lstinline{Let} should be
-a sequence of $i + j + 1$ imaginary
-\lstinline{let}'s, followed by an assignment
-of \lstinline{e$₁$} to the appropriate variable, and then the
-code for \lstinline{e$₂$}. However, we need to shift
-the variables in \lstinline{e$₁$} up by $j + 1$ because
-we are moving all of the $j$ \lstinline{let}'s for
-\lstinline{e$₂$} above \lstinline{e$₁$}, as well as the
-current \lstinline{let}. Thus, we need another function
-for shifting de Bruijn indices by an arbitrary amount.
+\noindent The case of \lstinline{lift-locals-mon} for \lstinline{(Let m$_1$ m$_2$)}
+is the most interesting. Think of the result of
+\lstinline{lift-locals-mon m$₁$} as a sequence of $i$ imaginary
+\lstinline{let}'s surrounding \lstinline{e$₁$}. Similarly for
+\lstinline{lift-locals-mon m$₁$}.  The translation result for
+\lstinline{(Let m$_1$ m$_2$)} should be a sequence of $i + j + 1$ imaginary
+\lstinline{let} bindings followed by an assignment of \lstinline{e$₁$} to
+the appropriate variable, and then the code for
+\lstinline{e$₂$}. However, we need to shift the variables in
+\lstinline{e$₁$} up by $j + 1$ because we are moving all of the $j$
+\lstinline{let} bindings for \lstinline{e$₂$} above \lstinline{e$₁$}, as well
+as the current \lstinline{let}. Thus, we need another function for
+shifting de Bruijn indices by an arbitrary amount.
 
 \begin{lstlisting}
 shifts-imp-exp : Imp-Exp $→$ $ℕ$ $→$ $ℕ$ $→$ Imp-Exp
@@ -985,7 +978,7 @@ shifts-imp-exp : Imp-Exp $→$ $ℕ$ $→$ $ℕ$ $→$ Imp-Exp
 
 The variables in \lstinline{e$₂$} also need to be shifted.  They are
 shifted up by $i$ because we are moving all of the $i$
-\lstinline{let}'s for \lstinline{e$₁$} above
+\lstinline{let} bindings for \lstinline{e$₁$} above
 \lstinline{e$₂$}. Regarding the variable that serves as the left-hand
 side of the assignment, its de Bruijn index is $i + j$ because the
 original index for this \lstinline{Let} was $0$ but we have moved $i +
@@ -994,9 +987,9 @@ j$ other \lstinline{let}s above this variable occurrence.
 \begin{lstlisting}
 lift-locals-mon (Let m$₁$ m$₂$)
     with lift-locals-mon m$₁$
-... | i , e$₁$
+... $|$ i , e$₁$
     with lift-locals-mon m$₂$
-... | j , e$₂$ =
+... $|$ j , e$₂$ =
     let e$′₁$ = shifts-imp-exp e$₁$ 0 (suc j) in
     let e$′₂$ = shifts-imp-exp e$₂$ j i in
     suc (i + j) , Assign (i + j) e$′₁$ e$′₂$
@@ -1037,7 +1030,7 @@ number returned by \lstinline{lift-locals-mon m}. Also, note that
 because \lstinline{Mon} is a pure language, \lstinline{e} contains a
 single assignment to each variable, so $ρ₂$ is unchanged by the
 execution of \lstinline{e}. ($ρ₁$ is changed as each of its variables
-are assigned to for the first time.)
+are assigned for the first time.)
 
 \begin{lstlisting}
 lift-locals-mon-correct : $∀$(m : Mon)(e : Imp-Exp)
@@ -1048,8 +1041,9 @@ lift-locals-mon-correct : $∀$(m : Mon)(e : Imp-Exp)
       × length $ρ₁$ $≡$ length $ρ′₁$
 \end{lstlisting}
 
-The main lemma relies on more lemmas about shifting de Bruijn indices
-that generalize our previous ones to arbitrary amounts of shifting.
+The main lemma relies on another lemma about shifting de Bruijn
+indices that generalizes our previous one to arbitrary amounts of
+shifting.
 
 \begin{lstlisting}
 $⇓$shifts : $∀${e}{v}{s $s′$}{$ρ₁$ $ρ′₁$ $ρ₂$ $ρ₃$ $ρ′₃$} 
@@ -1108,8 +1102,8 @@ pass can avoid the duplication of code. We discuss the trivial blocks
         return t2 - x;
 \end{lstlisting}
   \hrule
-  \caption{Example after Explicate Control, with control flow
-    made explicit with goto.}
+  \caption{Example after Explicate Control, where control flow
+    is made explicit with goto.}
 \label{fig:running-example-goto}
 \end{figure}
 
@@ -1133,9 +1127,9 @@ continuations are represented simply as the generated code in the
 C-like IL. The function for Tail position of course needs no
 continuation parameter.
 
-All three functions will be building a control flow graph, which needs
-to be threaded into and out of these functions, so they use the
-following \lstinline{Build} monad:
+All three functions build a control flow graph, which needs to be
+threaded into and out of these functions, so they use the following
+\lstinline{Build} monad:
 
 \begin{lstlisting}
 Build A = CFG $→$ A × CFG
@@ -1146,7 +1140,7 @@ add-node : CStmt $→$ Build Id
 \end{lstlisting}
 
 \noindent The following four functions make up the Explicate Control
-pass. Next we discuss select cases of these functions.
+pass. Next we discuss selected cases of these functions.
 
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
 explicate : Imp-Prog $→$ CProg
@@ -1210,8 +1204,8 @@ of compilation is that you cannot duplicate code.\footnote{GHC
 violated this rule a decade ago:
 \url{https://stackoverflow.com/questions/35815503/what-ghc-optimization-is-responsible-for-duplicating-case-expressions}.}
 Thus, we add \lstinline{c} to the control-flow graph and
-instead use a \lstinline{Goto} to its label as the continuation
-for \lstinline{e$₂$} and \lstinline{e$₃$}.
+instead use a \lstinline{Goto} to the label for \lstinline{c}
+as the continuation for \lstinline{e$₂$} and \lstinline{e$₃$}.
 
 \begin{lstlisting}
 explicate-assign y (If e$₁$ e$₂$ e$₃$) c =
@@ -1258,13 +1252,14 @@ explicate-pred (Eq a$₁$ a$₂$) thn els =
 \end{lstlisting}
 
 For the finale of the Explicate Control pass, we discuss the
-translation of conditionals in \lstinline{explicate-pred}.  The two
+translation of the conditional \lstinline{(If e$₁$ e$₂$ e$₃$)}
+in \lstinline{explicate-pred}.  The two
 branches \lstinline{e$₂$} and \lstinline{e$₃$} are in predicate
 position, so we compile them with recursive calls to
 \lstinline{explicate-pred} to obtain \lstinline{c$₂$} and
 \lstinline{c$₃$}. However, they share the same two continuations,
 \lstinline{thn} and \lstinline{els}, so we add both of them to the CFG
-to avoid code duplication. Finally, we compile \lstinline{e$₁$} with
+to avoid code duplication. We compile \lstinline{e$₁$} with
 \lstinline{explicate-pred}, passing \lstinline{c$₂$} and
 \lstinline{c$₃$} as the continuations.
 
