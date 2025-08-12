@@ -558,10 +558,10 @@ transformation.)
 \label{sec:imp}
 
 The third language replaces \lstinline{Let} bindings with assignment
-expressions but retains the structured control-flow and
-expression-oriented nature of the language. This language brings us
-closer to x86 where variables are replaced by registers and stack
-locations, which are mutable. The abstract syntax for assignment is
+expressions but retains the expression-oriented and structured
+control-flow nature of the language. This language brings us closer to
+x86 where variables are replaced by registers and stack locations,
+which are mutable. The abstract syntax for assignment is
 \lstinline{(Assign $x$ $e_1$ $e_2$)} where $e_1$ is the right-hand
 side and $e_2$ is an expression to be executed after the assignment
 (like the body of a \lstinline{Let}).  The \lstinline{Program} AST
