@@ -294,10 +294,9 @@ no branching is needed.
 \CB{\TRUE}{c_1}{c_2} &= c_1 \\
 \CB{\FALSE}{c_1}{c_2} &= c_2
 \end{align*}
-\noindent The treatment code as continuation goes back to earlier work
-by \citet{Lawall:1994aa} on continuation-based partial
-evaluation. Indeed, the above is a partial evaluation of Boolean
-expressions.
+\noindent This idea builds on earlier work by \citet{Lawall:1994aa} on
+continuation-based partial evaluation. Indeed, the above is a partial
+evaluation of Boolean expressions.
 
 My first exposure to these ideas was in Kent Dybvig's compiler
 course~\citep{Dybvig:2010aa} where he taught the techniques used in
@@ -323,34 +322,43 @@ in Rocq) uses the one-function per context approach of Danvy in the
 RTLgen pass that translates from the CminorSel intermediate language
 to CompCert's register transfer language. The verified CakeML
 compiler, on the other hand, employs a naive translation of Boolean
-expressions and conditionals for the compilation of the stackLang 
-intermediate language into labLang~\citep{Kumar:2014aa}.
+expressions and conditionals for the compilation of stackLang into
+labLang~\citep{Kumar:2014aa}.
 
 Towards developing a course on verified compilation, I am interested
-in adapting these verification techniques to the compiler
-presented in the \emph{Essentials of Compilation}
-textbook~\citep{Siek:2023tr,Siek:2023ue}. That book takes an
-incremental approach to teaching compilers, that is, it guides the
-students through the creation of multiple compilers for a sequence of
-languages, each of which adds a language feature to the previous
-language. For the language with Boolean expressions and conditionals,
-the Explicate Control pass of the compiler uses the one-function per
-context approach of Danvy to translate into an x86-flavored register
-transfer language.  \emph{Essentials of Compilation} also employs the
-nanopass approach, breaking up the compiler into many small passes
-that are easier for student to digest~\citep{Sarkar:2004fk}.  There
-are many other pedogogical treatments of
-compilation~\citep{Appel:2003fk,Sumii:2005aa,Aho:2006wb,Cooper:2011aa,Grune:2012aa};
-what makes the \emph{Essentials of Compilation} unique is that it is
-the first textbook to apply the incremental approach.  However,
-\emph{Essentials of Compilation} does not include material about the
-formal verification of compilers; hence my present interest.
+in proving correctness of the compiler presented in the
+\emph{Essentials of Compilation}
+textbook~\citep{Siek:2023tr,Siek:2023ue}. While it does not include
+proofs of correctness for its compiler passes, the textbook is
+organized in a way that might facilitate the proofs of correctness.
+%
+\emph{Essentials of Compilation} takes an \emph{incremental} approach
+to teaching compilers, that is, it guides the students through the
+creation of multiple compilers for a sequence of languages, each of
+which adds a language feature to the previous language. For the
+language with Boolean expressions and conditionals, the Explicate
+Control pass of the compiler uses the one-function per context
+approach of Danvy to translate into an x86-flavored register transfer
+language.
+%
+In addition to being incremental, \emph{Essentials of Compilation}
+employs the \emph{nanopass} approach, breaking up the compiler into
+many small passes that are easier for students to
+digest~\citep{Sarkar:2004fk}.
+%
+There are many other pedogogical treatments of
+compilation~\citep{Appel:2003fk,Sumii:2005aa,Aho:2006wb,Cooper:2011aa,Grune:2012aa}
+but none of them take the incremental approach.
 
 This paper presents a proof of correctness in Agda for four nanopasses
 that translate a source language with let binding, integer arithmetic,
 conditional expressions and Booleans into an x86-flavored register
 transfer language. The Agda code is available in the supplementary
-material. It does not depend on particular features of Agda and could
+material and at the following location.
+\begin{center}
+\url{https://github.com/jsiek/correct_compilers}
+\end{center}
+The Agda code does not depend on special features of Agda and could
 have been carried out in Rocq, Isabelle, or Lean.\footnote{The choice
 of Agda for this paper is not an endorsement of Agda but is a
 byproduct of the author's relative expertise in Agda at the time of
@@ -388,7 +396,8 @@ passes into a single pass.
 
 Section~\ref{sec:langs} of the paper introduces the intermediate
 languages. Section~\ref{sec:compiler} describes the compiler,
-detailing each pass and the proof of correctness.
+detailing each pass and the proof of
+correctness. Section~\ref{sec:conclusion} concludes the paper.
 
 \section{The Languages}
 \label{sec:langs}
@@ -405,29 +414,26 @@ of the source language and four intermediate languages in Agda:
 These languages and their semantics are quite standard. However, there
 are many other intermediate languages in the literature to choose
 from~\citep{Flanagan:1993cg,Hatcliff:1994vn,Kelsey:1995uq,Birkedal:1996aa},
-so why these languages, and why in this particular order?  The answer
-is that they happen to represent the images of the four nanopasses.
-So then the next question is: why do we order the nanopasses in this
-way? The main thing to consider is that some passes make later passes
-easier because they remove a language feature that would have been
-complicated to handle. For example, the Lift Locals pass removes
-\texttt{let}, and I found \texttt{let} difficult to deal with in the
-proof of correctness for Explicate Control (\texttt{let} is relatively
-easy to handle in the code for Explicate Control). The other thing to
-consider is that some compiler passes use certain language features in
-their generated code, so the passes that remove those language
-features better come later in the ordering.  For example, the Closure
-Conversion pass (not discussed here) generates code with \texttt{let},
-so Closure Conversion comes before Lift Locals. Finally, many design
-choices in \emph{Essentials of Compilation} have been inherited from
-\citet{Dybvig:2010aa}
+so why these languages, and why this order?  The answer is that they
+happen to represent the images of the four nanopasses.  So then the
+next question is: why do we order the nanopasses this way? The main
+thing to consider is that some passes make later passes easier because
+they remove a language feature that would have been complicated to
+handle. For example, the Lift Locals pass removes \texttt{let}, and I
+found \texttt{let} difficult to deal with in the proof of correctness
+for Explicate Control. The other thing to consider is that some
+compiler passes use certain language features in their generated code,
+so the passes that remove those language features better come later in
+the ordering.  For example, the Closure Conversion pass (not discussed
+here) generates code with \texttt{let}, so Closure Conversion comes
+before Lift Locals. Finally, many design choices in \emph{Essentials
+of Compilation} have been inherited from \citet{Dybvig:2010aa}
 
 One of the perennial challenges of formalizing semantics in a proof
 assistant is that one needs to choose a representation of variables.
 Of the many options, my current favorite is good old de Bruijn
 indices~\citep{Bruijn:1972kx}.  Thus, identifiers \lstinline{Id} are
 represented as natural numbers.
-
 \begin{lstlisting}
 Id = $ℕ$
 \end{lstlisting}
@@ -1619,6 +1625,7 @@ compile-correct e s v ie =
 
 
 \section{Conclusion}
+\label{sec:conclusion}
 
 This paper takes a step in adapting the literature on compiler
 correctness~\citep{Leroy:2006fe,Kumar:2014aa} to a university course
