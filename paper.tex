@@ -1309,7 +1309,7 @@ The correctness theorem delegates to three lemmas, one for each
 
 The statement of the lemma for \lstinline{explicate-tail} is the most
 straightforward. If expression \lstinline{e} compiles to
-\lstinline{c}, and if \lstinline{e} evaluates to \lstinline{v}, then
+\lstinline{c} and \lstinline{e} evaluates to \lstinline{v}, then
 \lstinline{c} also evaluates to \lstinline{v}:
 \begin{lstlisting}
 explicate-tail-correct :
@@ -1323,7 +1323,7 @@ for assignment and conditional expressions rely on the correctness
 lemmas for \lstinline{explicate-assign} and
 \lstinline{explicate-pred}.
 
-The case for conditional expressions also two lemmas about the
+The case for conditional expressions requires two lemmas about the
 monotonicity of the control flow graph.  The induction hypothesis for
 \lstinline{e$₂$} says that the generated \lstinline{c$₂$} evaluates
 using the CFG that was produced by the compilation of
@@ -1331,7 +1331,7 @@ using the CFG that was produced by the compilation of
 for \lstinline{e$₁$} we need \lstinline{c$₂$} evaluated using the CFG
 that was produced by the compilation of \lstinline{e$₃$}.
 We define the following notation for
-expression that one CFG is a prefix of another CFG:
+saying that one CFG is a prefix of another CFG:
 \begin{lstlisting}
 G$₁$ $↝$ G$₂$ = $∃$[ G ] G$₁$ ++ G $≡$ G$₂$
 \end{lstlisting}
@@ -1342,7 +1342,7 @@ explicate-tail-CFG : $∀${e}{G$₁$ G$₂$}{c}
   $→$ explicate-tail e G$₁$ $≡$ (c , G$₂$)
   $→$ G$₁$ $↝$ G$₂$
 \end{lstlisting}
-\noindent And we prove that the big-step semantics is monotonic with
+\noindent We prove that the big-step semantics is monotonic with
 respect to the $↝$ relation on control flow graphs.
 \begin{lstlisting}
 eval-CFG : $∀${c}{$ρ$ $ρ′$}{B$₁$ B$₂$}{s s$′$}{v}
@@ -1387,22 +1387,23 @@ The following is the statement of correctness for
 explicate-pred-correct :
   $∀$ {e$₁$}{c$₁$ c$₂$ c}{b}{v}{s s$′$ s$″$}{$ρ$ $ρ′$ $ρ″$}{G G$′$}
   $→$ (s , $ρ$) $⊢$ e$₁$ $⇓$ Bool b $⊣$ (s$′$ , $ρ′$)
-  $→$ ((s$′$,$ρ′$) , G $⊢ᶜ$ if b then c$₂$ else c$₃$ $⇓$ v $⊣$ (s$″$,$ρ″$))
+  $→$ ((s$′$,$ρ′$) , G $⊢ᶜ$ (if b then c$₂$ else c$₃$) $⇓$ v $⊣$ (s$″$,$ρ″$))
   $→$ explicate-pred e$₁$ c$₂$ c$₃$ G $≡$ (c$₁$ , G$′$)
   $→$ (s , $ρ$) , G$′$ $⊢ᶜ$ c$₁$ $⇓$ v $⊣$ (s$″$ , $ρ″$)
 \end{lstlisting}
 
-\noindent This statement of correctness is interesting because it
-requires the premise that either continuation \lstinline{c$₂$} or
-\lstinline{c$₃$} evaluates to \lstinline{v}, depending on whether the
-expression \lstinline{e$₁$} evaluates to \lstinline{true} or
-\lstinline{false}. This explains the use of Agda's
-\lstinline{if-then-else} in the second premise of
-\lstinline{explicate-pred-correct}.\footnote{The formulation of this
-lemma follows that of CompCert's \lstinline{transl\_condexpr\_prop}.}
+\noindent This statement is interesting because it requires the
+premise that either continuation \lstinline{c$₂$} or \lstinline{c$₃$}
+evaluates to \lstinline{v}, depending on whether the expression
+\lstinline{e$₁$} evaluates to \lstinline{true} or
+\lstinline{false}. This explains the 
+\lstinline{(if b then c$₂$ else c$₃$)} in the second premise.\footnote{The
+formulation of this lemma follows that of CompCert's
+\lstinline{transl\_condexpr\_prop}.}
 
 The proof of \lstinline{explicate-pred-correct} uses many of the
-monotonicity lemmas that we have already proved, plus one more.
+monotonicity lemmas that we have already proved, plus the following
+one.
 
 \begin{lstlisting}
 explicate-pred-CFG : $∀${e}{c$₁$ c$₂$ c}{G$₁$ G$₂$}
@@ -1415,7 +1416,7 @@ explicate-pred-CFG : $∀${e}{c$₁$ c$₂$ c}{G$₁$ G$₂$}
 The responsibility of the Select Instructions pass is to convert the
 assignment statements and primitive operations of the C-like language
 into x86 instructions. The minor challenge is that many x86
-instructions take just two arguments and have an update-in-place
+instructions take only two arguments and have an update-in-place
 semantics. The output of Select Instructions on the running example is
 shown in figure~\ref{fig:running-example-x86}.\footnote{The redundant
 \texttt{movq} instructions are removed by the Patch Instructions pass
@@ -1424,7 +1425,7 @@ Instructions and Register Allocation.}
 
 \begin{figure}[tp]
   \hrule
-\begin{lstlisting}[mathescape=false]
+\begin{lstlisting}[mathescape=false,basicstyle=\ttfamily\footnotesize]
     var x, y, t1, t2
     block_0:
        callq read_int
@@ -1464,7 +1465,7 @@ Instructions and Register Allocation.}
 \label{fig:running-example-x86}
 \end{figure}
 
-The function \lstinline{select-inst} translation a whole program in
+The function \lstinline{select-inst} translates a whole program in
 the C-like language to x86.
 \begin{lstlisting}
 select-inst (Program n l B) =
@@ -1472,10 +1473,10 @@ select-inst (Program n l B) =
 \end{lstlisting}
 
 \noindent The \lstinline{select-stmt} function maps each statement to
-one or more instructions. The return statement is compiled like an
-assignment to the \lstinline{rax} register. (The calling convention
-for x86 says that the return value of a function is passed in
-\lstinline{rax}.) 
+one or more instructions. The \lstinline{Return} statement is compiled
+like an assignment to the \lstinline{rax} register. (The calling
+convention for x86 says that the return value of a function is passed
+in \lstinline{rax}.)
 
 \begin{lstlisting}
 select-stmt (Return e) = select-assign e (Reg rax)
@@ -1536,11 +1537,11 @@ select-assign (Sub (Var x) a$₂$) (Var x) =
 any of the special cases.
 
 We compile the assignment of an equality comparison into a
-\lstinline{CmpQ} and a \lstinline{MovQ}. The \lstinline{CmpQ} always
-puts its result into \lstinline{rax}, so the \lstinline{MovQ} is
-needed to place the result into the destination.\footnote{The real
-\lstinline{cmpq} instruction is slightly stranger, involving
-the \lstinline{EFLAGS} register.}
+\lstinline{CmpQ} and a \lstinline{MovQ}. The \lstinline{CmpQ} puts its
+result into \lstinline{rax}, so the \lstinline{MovQ} is needed to
+place the result into the destination.\footnote{The real
+\lstinline{cmpq} instruction is stranger still, involving the
+\lstinline{EFLAGS} register.}
 
 \begin{lstlisting}
 select-assign (Eq a$₁$ a$₂$) dest =
@@ -1579,8 +1580,8 @@ select-stmt-correct : $∀$ (c : CStmt) ($ρ$ $ρ′$ : Env Value)
 \end{lstlisting}
 
 When the statement is an assignment, the proof uses the following
-lemma. It states that if expression \lstinline{e} evaluates to
-\lstinline{v}, then the instructions generated for \lstinline{e} put
+lemma. It states that when expression \lstinline{e} evaluates to
+\lstinline{v}, the instructions generated for \lstinline{e} put
 \lstinline{v} into the specified destination. The predicate
 \lstinline{wrote} specifies the update to either the appropriate
 variable or register depending on the kind of destination.
@@ -1607,7 +1608,7 @@ variable or the register (\lstinline{rax}).
 The correctness theorem for the compiler composes the four correctness
 lemmas of the previous subsections.
 
-\begin{lstlisting}
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
 compile-correct : (e : Exp) (s : Inputs) (v : Value)
   $→$ interp-LIf e s $≡$ just v
   $→$ interp-x86-var (compile e) s v
@@ -1635,7 +1636,7 @@ lifts \lstinline{let} bindings and the second that compiles structured
 control-flow into \lstinline{goto}. In designing these compiler passes
 and proofs, it is enjoyable to trace the history of ideas going back
 to \citet{Aho:1986qf}, \citet{Dybvig:1990aa}, and Olivier Danvy's
-one-pass transformation into monadic normal form~\citep{Danvy:2003fk}.
+transformation into monadic normal form~\citep{Danvy:2003fk}.
 
 
 %% The next two lines define the bibliography style to be used, and
