@@ -1,12 +1,119 @@
 %% This BibTeX bibliography file was created using BibDesk.
 %% https://bibdesk.sourceforge.io/
 
-%% Created for jsiek at 2025-08-11 15:08:28 -0400 
+%% Created for jsiek at 2025-08-17 10:55:00 -0400 
 
 
 %% Saved with string encoding Unicode (UTF-8) 
 
 
+
+@url{Siek:2025aa,
+	author = {Jeremy G. Siek},
+	date-added = {2025-08-17 10:52:43 -0400},
+	date-modified = {2025-08-17 10:54:51 -0400},
+	title = {Artifact for Verified Nanopasses for Compiling Conditionals},
+	url = {https://doi.org/10.5281/zenodo.16890248}}
+
+@inproceedings{Kameyama:2008aa,
+	abstract = {Code generation lets us write well-abstracted programs without performance penalty. Writing a correct code generator is easier than building a full-scale compiler but still hard. Typed multistage languages such as MetaOCaml help in two ways: they provide simple annotations to express code generation, and they assure that the generated code is well-typed and well-scoped. Unfortunately, the assurance only holds without side effects such as state and control. Without effects, generators often have to be written in a continuation-passing or monadic style that has proved inconvenient. It is thus a pressing open problem to combine effects with staging in a sound type system.This paper takes a first step towards solving the problem, by translating the staging away. Our source language models MetaOCaml restricted to one future stage. It is a call-by-value language, with a sound type system and a small-step operational semantics, that supports building open code, running closed code, cross-stage persistence, and non-termination effects. We translate each typing derivation from this source language to the unstaged System F with constants. Our translation represents future-stage code using closures, yet preserves the typing, α-equivalence (hygiene), and (we conjecture) termination and evaluation order of the staged program.To decouple evaluation from scope (a defining characteristic of staging), our translation weakens the typing environment of open code using a term coercion reminiscent of Goedel's translation from intuitionistic to modal logic. By converting open code to closures with typed environments, our translation establishes a framework in which to study staging with effects and to prototype staged languages. It already makes scope extrusion a type error.},
+	address = {New York, NY, USA},
+	author = {Kameyama, Yukiyoshi and Kiselyov, Oleg and Shan, Chung-chieh},
+	booktitle = {Proceedings of the 2008 ACM SIGPLAN Symposium on Partial Evaluation and Semantics-Based Program Manipulation},
+	date-added = {2025-08-13 18:31:49 -0400},
+	date-modified = {2025-08-13 18:31:52 -0400},
+	doi = {10.1145/1328408.1328430},
+	isbn = {9781595939777},
+	keywords = {closures, multistage programming, mutable state and control effects, parametric polymorphism, type abstraction},
+	location = {San Francisco, California, USA},
+	numpages = {11},
+	pages = {147--157},
+	publisher = {Association for Computing Machinery},
+	series = {PEPM '08},
+	title = {Closing the stage: from staged code to typed closures},
+	url = {https://doi.org/10.1145/1328408.1328430},
+	year = {2008},
+	bdsk-file-1 = {YnBsaXN0MDDRAQJccmVsYXRpdmVQYXRoXxAVY2xvc2luZy10aGUtc3RhZ2UucGRmCAsYAAAAAAAAAQEAAAAAAAAAAwAAAAAAAAAAAAAAAAAAADA=},
+	bdsk-url-1 = {https://doi.org/10.1145/1328408.1328430}}
+
+@inproceedings{murase2023contextual,
+	author = {Murase, Yuito and Nishiwaki, Yuichi and Igarashi, Atsushi},
+	booktitle = {European Symposium on Programming},
+	date-added = {2025-08-13 09:17:24 -0400},
+	date-modified = {2025-08-13 09:17:24 -0400},
+	organization = {Springer Nature Switzerland Cham},
+	pages = {281--308},
+	title = {Contextual Modal Type Theory with Polymorphic Contexts},
+	year = {2023},
+	bdsk-file-1 = {YnBsaXN0MDDRAQJccmVsYXRpdmVQYXRoXxAQMTgwMS4wOTIyNXYyLnBkZggLGAAAAAAAAAEBAAAAAAAAAAMAAAAAAAAAAAAAAAAAAAAr}}
+
+@article{Jang:2022aa,
+	abstract = {We describe the foundation of the metaprogramming language, Mundefinedbius, which supports the generation of polymorphic code and, more importantly, the analysis of polymorphic code via pattern matching. Mundefinedbius has two main ingredients: 1) we exploit contextual modal types to describe open code together with the context in which it is meaningful. In Mundefinedbius, open code can depend on type and term variables (level 0) whose values are supplied at a later stage, as well as code variables (level 1) that stand for code templates supplied at a later stage. This leads to a multi-level modal lambda-calculus that supports System-F style polymorphism and forms the basis for polymorphic code generation. 2) we extend the multi-level modal lambda-calculus to support pattern matching on code. As pattern matching on polymorphic code may refine polymorphic type variables, we extend our type-theoretic foundation to generate and track typing constraints that arise. We also give an operational semantics and prove type preservation. Our multi-level modal foundation for Mundefinedbius provides the appropriate abstractions for both generating and pattern matching on open code without committing to a concrete representation of variable binding and contexts. Hence, our work is a step towards building a general type-theoretic foundation for multi-staged metaprogramming that, on the one hand, enforces strong type guarantees and, on the other hand, makes it easy to generate and manipulate code. This will allow us to exploit the full potential of metaprogramming without sacrificing the reliability of and trust in the code we are producing and running.},
+	address = {New York, NY, USA},
+	articleno = {39},
+	author = {Jang, Junyoung and G\'{e}lineau, Samuel and Monnier, Stefan and Pientka, Brigitte},
+	date-added = {2025-08-13 08:47:06 -0400},
+	date-modified = {2025-08-13 08:48:00 -0400},
+	doi = {10.1145/3498700},
+	issue_date = {January 2022},
+	journal = {Proc. ACM Program. Lang.},
+	keywords = {Contextual Types, Metaprogramming, Polymorphism, Type Systems},
+	month = jan,
+	number = {POPL},
+	numpages = {27},
+	publisher = {Association for Computing Machinery},
+	title = {Moebius: metaprogramming using contextual types: the stage where system f can pattern match on itself},
+	url = {https://doi.org/10.1145/3498700},
+	volume = {6},
+	year = {2022},
+	bdsk-file-1 = {YnBsaXN0MDDRAQJccmVsYXRpdmVQYXRoW21vZWJpdXMucGRmCAsYAAAAAAAAAQEAAAAAAAAAAwAAAAAAAAAAAAAAAAAAACQ=},
+	bdsk-url-1 = {https://doi.org/10.1145/3498700}}
+
+@article{Davies:2017aa,
+	abstract = {This article demonstrates that there is a fundamental relationship between temporal logic and languages that involve multiple stages, such as those used to analyze binding times in the context of partial evaluation. This relationship is based on an extension of the Curry-Howard isomorphism, which identifies proofs with programs, and propositions with types. Our extension involves the ``next time'' (○) operator from linear-time temporal logic and yields a λ-calculus λ$\,^{\circ}$ with types of the form ○ A for expressions in the subsequent stage, with appropriate introduction and elimination forms. We demonstrate that λ$\,^{\circ}$ is equivalent to the core of a previously studied multilevel binding-time analysis. This is similar to work by Davies and Pfenning on staged computation based on the necessity (□) operator of modal logic, but □ only allows closed code, and naturally supports a code evaluation construct, whereas ○ captures open code, thus is more flexible, but is incompatible with such a construct. Instead, code evaluation is an external global operation that is validated by the proof theory regarding closed proofs of ○ formulas. We demonstrate the relevance of λ$\,^{\circ}$ to staged computation directly by showing that that normalization can be done in an order strictly following the times of the logic. We also extend λ$\,^{\circ}$ to small functional language and show that it would serve as a suitable basis for directly programming with multiple stages by presenting some example programs.},
+	address = {New York, NY, USA},
+	articleno = {1},
+	author = {Davies, Rowan},
+	date-added = {2025-08-13 08:38:13 -0400},
+	date-modified = {2025-08-13 08:38:14 -0400},
+	doi = {10.1145/3011069},
+	issn = {0004-5411},
+	issue_date = {February 2017},
+	journal = {J. ACM},
+	keywords = {staged computation, partial evaluation, Propositions as types},
+	month = mar,
+	number = {1},
+	numpages = {45},
+	publisher = {Association for Computing Machinery},
+	title = {A Temporal Logic Approach to Binding-Time Analysis},
+	url = {https://doi.org/10.1145/3011069},
+	volume = {64},
+	year = {2017},
+	bdsk-file-1 = {YnBsaXN0MDDRAQJccmVsYXRpdmVQYXRoXxAfdGVtcG9yYWwtbG9naWMtYmluZGluZy10aW1lLnBkZggLGAAAAAAAAAEBAAAAAAAAAAMAAAAAAAAAAAAAAAAAAAA6},
+	bdsk-url-1 = {https://doi.org/10.1145/3011069}}
+
+@article{Nanevski:2008aa,
+	abstract = {The intuitionistic modal logic of necessity is based on the judgmental notion of categorical truth. In this article we investigate the consequences of relativizing these concepts to explicitly specified contexts. We obtain contextual modal logic and its type-theoretic analogue. Contextual modal type theory provides an elegant, uniform foundation for understanding metavariables and explicit substitutions. We sketch some applications in functional programming and logical frameworks.},
+	address = {New York, NY, USA},
+	articleno = {23},
+	author = {Nanevski, Aleksandar and Pfenning, Frank and Pientka, Brigitte},
+	date-added = {2025-08-13 08:33:58 -0400},
+	date-modified = {2025-08-13 08:34:00 -0400},
+	doi = {10.1145/1352582.1352591},
+	issn = {1529-3785},
+	issue_date = {June 2008},
+	journal = {ACM Trans. Comput. Logic},
+	keywords = {Type theory, intuitionistic modal logic, logical frameworks},
+	month = jun,
+	number = {3},
+	numpages = {49},
+	publisher = {Association for Computing Machinery},
+	title = {Contextual modal type theory},
+	url = {https://doi.org/10.1145/1352582.1352591},
+	volume = {9},
+	year = {2008},
+	bdsk-file-1 = {YnBsaXN0MDDRAQJccmVsYXRpdmVQYXRoXxAdY29udGV4dC1tb2RhbC10eXBlLXRoZW9yeS5wZGYICxgAAAAAAAABAQAAAAAAAAADAAAAAAAAAAAAAAAAAAAAOA==},
+	bdsk-url-1 = {https://doi.org/10.1145/1352582.1352591}}
 
 @inproceedings{Lawall:1994aa,
 	abstract = {Binding-time improvements aim at making partial evaluation (a.k.a. program specialization) yield a better result. They have been achieved so far mostly by hand-transforming the source program. We observe that as they are better understood, these hand-transformations are progressively integrated into partial evaluators, thereby alleviating the need for source-level binding-time improvements.Control-based binding-time improvements, for example, follow this pattern: they have evolved from ad-hoc source-level rewrites to a systematic source-level transformation into continuation-passing style (CPS). Recently, Bondorf has explicitly integrated the CPS transformation into the specializer, thus partly alleviating the need for source-level CPS transformation. This CPS integration is remarkably effective but very complex and goes beyond a simple CPS transformation. We show that it can be achieved directly by using the control operators shift and reset, which provide access to the current continuation as a composable procedure.We automate, reproduce, and extend Bondorf's results, and describe how this approach scales up to hand-writing partial-evaluation compilers. The first author has used this method to bootstrap the new release of Consel's partial evaluator Schism. The control operators not only allow the partial evaluator to remain in direct style, but also can speed up partial evaluation significantly.},
@@ -25,8 +132,8 @@
 	title = {Continuation-based partial evaluation},
 	url = {https://doi.org/10.1145/182409.182483},
 	year = {1994},
-	bdsk-url-1 = {https://doi.org/10.1145/182409.182483},
-	bdsk-file-1 = {YnBsaXN0MDDRAQJccmVsYXRpdmVQYXRoXxAdY29udGludWF0aW9uLXBhcnRpYWwtZXZhbC5wZGYICxgAAAAAAAABAQAAAAAAAAADAAAAAAAAAAAAAAAAAAAAOA==}}
+	bdsk-file-1 = {YnBsaXN0MDDRAQJccmVsYXRpdmVQYXRoXxAdY29udGludWF0aW9uLXBhcnRpYWwtZXZhbC5wZGYICxgAAAAAAAABAQAAAAAAAAADAAAAAAAAAAAAAAAAAAAAOA==},
+	bdsk-url-1 = {https://doi.org/10.1145/182409.182483}}
 
 @inproceedings{yaguchi2025staged,
 	author = {Yaguchi, Hiroto and Kameyama, Yukiyoshi},
@@ -36,8 +143,8 @@
 	pages = {94--104},
 	title = {Staged Gradual Typing},
 	year = {2025},
-	bdsk-url-1 = {https://dl.acm.org/doi/abs/10.1145/3742876.3742880},
-	bdsk-file-1 = {YnBsaXN0MDDRAQJccmVsYXRpdmVQYXRoXxASc3RhZ2VkX2dyYWR1YWwucGRmCAsYAAAAAAAAAQEAAAAAAAAAAwAAAAAAAAAAAAAAAAAAAC0=}}
+	bdsk-file-1 = {YnBsaXN0MDDRAQJccmVsYXRpdmVQYXRoXxASc3RhZ2VkX2dyYWR1YWwucGRmCAsYAAAAAAAAAQEAAAAAAAAAAwAAAAAAAAAAAAAAAAAAAC0=},
+	bdsk-url-1 = {https://dl.acm.org/doi/abs/10.1145/3742876.3742880}}
 
 @article{cheney2013practical,
 	author = {Cheney, James and Lindley, Sam and Wadler, Philip},

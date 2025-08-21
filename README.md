@@ -34,7 +34,7 @@ Agda files that prove their correctess.
 
 ## The LIf Language (If + Booleans + Let + Integers)
 
-The main correctness theorem for LVar is in
+The main correctness theorem for LIf is in
 
     LIf2Correct.agda
 
